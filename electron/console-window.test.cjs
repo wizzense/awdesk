@@ -39,19 +39,23 @@ test("the rail is in this exact order -- a drop or a reorder must fail here", ()
     "settings", "desktop"]);
 });
 
-test("the rail is five places, each printed ONCE (the old rail printed CONTROL and PRESENCE twice)", () => {
+test("the rail is six places, each printed ONCE (the old rail printed CONTROL and PRESENCE twice)", () => {
   const { PLACES } = require("./console-window.cjs");
+  // Sessions S1: Sessions is its own place, between Decisions and Agents.
   assert.deepEqual(PLACES.filter((p) => !p.footer).map((p) => p.id),
-    ["home", "decisions", "agents", "avatars", "fleet"]);
+    ["home", "decisions", "sessions", "agents", "avatars", "fleet"]);
   const ids = PLACES.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length, "a place is listed twice");
   for (const pane of PANES) {
     assert.ok(ids.includes(pane.place), `${pane.id} names no place (got ${pane.place})`);
   }
-  // Voices live with the bodies they voice; the three agent surfaces share one place.
+  // Voices live with the bodies they voice; chat and command share Agents.
   const placeOf = Object.fromEntries(PANES.map((p) => [p.id, p.place]));
   assert.deepEqual(["stage", "characters", "cast"].map((id) => placeOf[id]), ["avatars", "avatars", "avatars"]);
-  assert.deepEqual(["sessions", "chat", "command"].map((id) => placeOf[id]), ["agents", "agents", "agents"]);
+  assert.deepEqual(["sessions", "chat", "command"].map((id) => placeOf[id]), ["sessions", "agents", "agents"]);
+  const byId = Object.fromEntries(paneSources("http://127.0.0.1:5173").map((p) => [p.id, p]));
+  assert.equal(byId.sessions.placeLabel, "Sessions");
+  assert.equal(byId.chat.placeIcon, "chat", "Agents and Sessions must not share one rail icon");
 });
 
 test("paneSources carries the place label and detachability to the shell", () => {

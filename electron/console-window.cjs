@@ -72,14 +72,13 @@ const PANES = Object.freeze([
     place: "decisions",
     kind: "view", query: "deck=1",
   }),
-  // Slice 1 of COCKPIT-DESIGN: the unified session directory (daemon-owned
-  // sessions + DISCOVERED interactive Claude Code tabs), read-only with live
-  // tails. No detach wiring on purpose yet — a pane that cannot come back out
-  // yet also must not offer a Detach button that does nothing (callWindow
-  // answers "no open target" and the rail stays honest).
+  // The unified session directory (daemon-owned sessions + DISCOVERED
+  // interactive Claude Code tabs) with live tails and, since sessions S1, the
+  // verbs the daemon offers per row (focus, message, interrupt) plus New
+  // session. Its own place on the rail, between Decisions and Agents.
   Object.freeze({
-    id: "sessions", label: "Sessions", hint: "Every Claude session, live", section: "Agents", icon: "layers",
-    place: "agents",
+    id: "sessions", label: "Sessions", hint: "Every session: focus, message, start one", section: "Agents", icon: "layers",
+    place: "sessions",
     kind: "file", file: "sessions.html",
   }),
   Object.freeze({
@@ -157,7 +156,11 @@ const PANES = Object.freeze([
 const PLACES = Object.freeze([
   Object.freeze({ id: "home", label: "Home", icon: "home" }),
   Object.freeze({ id: "decisions", label: "Decisions", icon: "bell" }),
-  Object.freeze({ id: "agents", label: "Agents", icon: "layers" }),
+  // Sessions S1 (2026-09-27, owner: "stop working in Windows Terminal"): the
+  // session directory is where the owner WORKS now, so it is a place of its own
+  // rather than a tab behind Agents.
+  Object.freeze({ id: "sessions", label: "Sessions", icon: "layers" }),
+  Object.freeze({ id: "agents", label: "Agents", icon: "chat" }),
   Object.freeze({ id: "avatars", label: "Avatars", icon: "users" }),
   Object.freeze({ id: "fleet", label: "Fleet", icon: "server" }),
   Object.freeze({ id: "settings", label: "Settings", icon: "settings", footer: true }),

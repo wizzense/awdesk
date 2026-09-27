@@ -72,6 +72,100 @@ async function listSessions({ fetchImpl = globalThis.fetch, timeoutMs = 6000 } =
   }
 }
 
+/**
+ * One call to the daemon, as a RENDERED result: { ok, status, body, note }.
+ * Never throws -- a verb that fails says why in `note` (the daemon's own
+ * `detail` when it gave one), because a button that silently does nothing is
+ * the failure the Sessions pane exists to remove.
+ */
+async function daemonCall(method, route, body, { fetchImpl = globalThis.fetch, timeoutMs = 8000 } = {}) {
+  const token = harnessToken();
+  if (!token) return { ok: false, status: 0, body: null, note: "no harness token (~/.aither/harness_token)" };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(`${DAEMON}${route}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    });
+    let parsed = null;
+    try { parsed = await res.json(); } catch { parsed = null; }
+    if (!res.ok) {
+      const detail = parsed && typeof parsed.detail === "string" ? parsed.detail : `daemon answered ${res.status}`;
+      return { ok: false, status: res.status, body: parsed, note: detail };
+    }
+    return { ok: true, status: res.status, body: parsed, note: "" };
+  } catch (error) {
+    const why = error && error.name === "AbortError"
+      ? `daemon did not answer within ${Math.round(timeoutMs / 1000)}s`
+      : "daemon unreachable (start it: adk harness serve)";
+    return { ok: false, status: 0, body: null, note: why };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** A session id goes into a URL path: refuse anything but a plain token. */
+function safeId(sessionId) {
+  const id = String(sessionId || "");
+  return /^[A-Za-z0-9._-]{1,128}$/.test(id) && id !== "." && id !== ".." ? id : "";
+}
+
+const BAD_ID = Object.freeze({ ok: false, status: 0, body: null, note: "not a valid session id" });
+
+/** Queue text for the session's NEXT prompt (the daemon's steering mailbox). */
+function messageSession(sessionId, text, opts) {
+  const id = safeId(sessionId);
+  if (!id) return Promise.resolve({ ...BAD_ID });
+  const clean = String(text || "").trim();
+  if (!clean) return Promise.resolve({ ok: false, status: 0, body: null, note: "type a message first" });
+  return daemonCall("POST", `/sessions/${id}/message`, { text: clean }, opts);
+}
+
+/** Raise the session's terminal window, or reopen it with --resume. */
+function focusSession(sessionId, opts) {
+  const id = safeId(sessionId);
+  return id ? daemonCall("POST", `/sessions/${id}/focus`, {}, opts) : Promise.resolve({ ...BAD_ID });
+}
+
+/** Interrupt a daemon-owned session's current turn (managed sessions only). */
+function interruptSession(sessionId, opts) {
+  const id = safeId(sessionId);
+  return id ? daemonCall("POST", `/sessions/${id}/interrupt`, undefined, opts) : Promise.resolve({ ...BAD_ID });
+}
+
+/** Where "New session" starts by default: $AITHER_SESSION_CWD, else the owner's
+ *  main checkout when it exists on this machine, else the home directory. */
+function defaultSessionCwd({ env = process.env, exists = fs.existsSync } = {}) {
+  if (env.AITHER_SESSION_CWD) return env.AITHER_SESSION_CWD;
+  const main = "C:\\AitherOS-Fresh";
+  return process.platform === "win32" && exists(main) ? main : os.homedir();
+}
+
+/** Start a new session; `harness` comes from the daemon's /harnesses. */
+function spawnSession({ cwd = "", harness = "claude", title = "" } = {}, opts) {
+  return daemonCall("POST", "/sessions", {
+    harness: String(harness || "claude"),
+    cwd: String(cwd || ""),
+    title: String(title || ""),
+  }, { timeoutMs: 20000, ...(opts || {}) });
+}
+
+/** The harnesses this box can start, installed ones only: [{ id, label }]. */
+async function listHarnesses(opts) {
+  const out = await daemonCall("GET", "/harnesses", undefined, opts);
+  if (!out.ok) return { ok: false, harnesses: [], note: out.note };
+  const rows = Array.isArray(out.body && out.body.harnesses) ? out.body.harnesses : [];
+  return {
+    ok: true,
+    harnesses: rows.filter((h) => h && h.installed !== false)
+      .map((h) => ({ id: String(h.id), label: String(h.label || h.id) })),
+    note: "",
+  };
+}
+
 /** The last `maxLines` lines of a transcript, capped by BYTES so a huge JSONL
  *  cannot stall the pane, and read from the END — a tail is all this view
  *  shows, and reading a 200 MB file to print its last page is how a live view
@@ -254,6 +348,13 @@ function sharedSessionsPoller() {
 
 module.exports = {
   listSessions,
+  daemonCall,
+  messageSession,
+  focusSession,
+  interruptSession,
+  spawnSession,
+  listHarnesses,
+  defaultSessionCwd,
   tailTranscript,
   harnessToken,
   sessionsBrief,
