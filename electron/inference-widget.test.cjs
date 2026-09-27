@@ -124,9 +124,9 @@ test("baseUrl only admits an https aitherium.com origin or loopback (the cookie 
   const prev = process.env.AWDESK_OPS_BASE;
   try {
     process.env.AWDESK_OPS_BASE = "https://evil.example.com";
-    assert.equal(baseUrl(), "https://aitherium.com");
+    assert.equal(baseUrl(), "https://api.aitherium.com");
     process.env.AWDESK_OPS_BASE = "http://aitherium.com";
-    assert.equal(baseUrl(), "https://aitherium.com");
+    assert.equal(baseUrl(), "https://api.aitherium.com");
     process.env.AWDESK_OPS_BASE = "https://portal.aitherium.com/x";
     assert.equal(baseUrl(), "https://portal.aitherium.com");
     process.env.AWDESK_OPS_BASE = "http://127.0.0.1:3000";
