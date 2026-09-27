@@ -93,6 +93,12 @@ const {
   getControl: getFleetControl,
   fleetSummaryCached,
 } = fleetWindow;
+// The compact always-on-top inference widget (owner, 2026-09-27): nodes + models
+// with live load, acting through the Veil /api/ops/actions door.
+const {
+  createInferenceOpsWindow,
+  setSignInHandler: setInferenceOpsSignInHandler,
+} = require("./inference-window.cjs");
 const commandWindow = require("./command-window.cjs");
 const {
   createCommandWindow,
@@ -864,6 +870,13 @@ function runCommand(id, arg, { surface = "menu", slotId = null } = {}) {
     case "window.size.smaller": return void shrinkWindow();
     // U27's cast.open record -- the one door onto cast.json from tray/avatar-
     // menu/palette (see console-window.cjs's `cast` pane).
+    case "inference.open": {
+      // Sign-in must land the cookie in the living-desktop PARTITION, which
+      // opening the overlay does (it syncs the portal session on open).
+      setInferenceOpsSignInHandler(() => showLivingDesktop());
+      createInferenceOpsWindow();
+      return;
+    }
     case "cast.open": {
       openConsole();
       focusPane("cast");
@@ -1149,6 +1162,7 @@ if (!smokeIsRequested && !app.requestSingleInstanceLock()) {
     createTray();
     maybePromptForFirstCharacter();
     if (process.argv.includes("--fleet")) createFleetWindow();
+    if (process.argv.includes("--inference")) runCommand("inference.open");
     if (process.argv.includes("--command")) createCommandWindow(getFleetControl(), { createFleetWindow });
     if (process.argv.includes("--overlay")) showLivingDesktop();
     if (process.argv.includes("--desktop")) showDesktopApp();

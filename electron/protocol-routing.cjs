@@ -4,7 +4,7 @@
  * protocol-routing.cjs -- how the desk is reached from OUTSIDE its own windows:
  * a desk:// URL (scripts, other apps, the Start-menu links, macOS open-url) and
  * the argv a second launch hands the running instance (--open-deck, --fleet,
- * --console, a jump-list `--run=<id>`, --command, --overlay, --desktop).
+ * --inference, --console, a jump-list `--run=<id>`, --command, --overlay, --desktop).
  *
  * Moved out of main.cjs in slice 3 of docs/UX-REIMPLEMENTATION.md. Pure move: the
  * verbs, the flag order and the quiet gate are what main.cjs had. Main keeps the
@@ -80,6 +80,10 @@ function createProtocolRouting({
     }
     if (argv.includes("--fleet")) {
       createFleetWindow();
+      return;
+    }
+    if (argv.includes("--inference")) {
+      runCommand("inference.open", undefined, { surface: "argv" });
       return;
     }
     if (argv.includes("--console")) {

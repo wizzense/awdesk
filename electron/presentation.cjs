@@ -245,6 +245,26 @@ const ROUTE_WINDOWS = {
       autoHideMenuBar: true,
     },
   },
+  // The Inference ops widget (owner, 2026-09-27; ported from the monorepo
+  // awdesk mirror): compact, frameless, always-on-top. inference-window.cjs
+  // keeps its desk:inference-* IPC, the partition-bound fetch and the
+  // top-right placement + "floating" level it applies after open.
+  inference: {
+    file: "inference-widget.html",
+    preload: "inference-preload.cjs",
+    window: {
+      width: 360,
+      height: 520,
+      minWidth: 300,
+      minHeight: 240,
+      show: false,
+      frame: false,
+      alwaysOnTop: true,
+      resizable: true,
+      title: "Aither Inference Ops",
+      backgroundColor: "#0f1218",
+    },
+  },
 };
 
 // One live handle per standalone route; nulled on 'closed'. Module scope because
