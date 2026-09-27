@@ -187,7 +187,7 @@ function renderSessions(s) {
     return;
   }
   const parts = Object.entries(s.byStatus).map(([k, v]) => `${v} ${k}`);
-  $("s-count").textContent = `${s.total} · ${parts.join(", ")}`;
+  $("s-count").textContent = `${s.total} · ${parts.join(", ")}` + (s.stale ? ` · ${s.staleNote}` : "");
   if (!s.recent.length) {
     list.appendChild(el("div", "ui-empty", "No active sessions."));
     return;

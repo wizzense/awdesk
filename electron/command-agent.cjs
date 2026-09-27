@@ -181,8 +181,8 @@ function classifyCommand(text) {
 
 /** The live-sessions brief every agent prompt carries (sessions-client.cjs). */
 async function defaultSessionsContext() {
-  const { listSessions, sessionsBrief } = require("./sessions-client.cjs");
-  return sessionsBrief(await listSessions({ timeoutMs: 3000 }));
+  const { sharedSessionsPoller, sessionsBrief } = require("./sessions-client.cjs");
+  return sessionsBrief(await sharedSessionsPoller().get());
 }
 
 class CommandAgent extends EventEmitter {

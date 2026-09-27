@@ -53,7 +53,15 @@ async function listSessions({ fetchImpl = globalThis.fetch, timeoutMs = 6000 } =
     if (!res.ok) return { ok: false, sessions: [], note: `daemon answered ${res.status}` };
     const body = await res.json();
     const sessions = Array.isArray(body.sessions) ? body.sessions : [];
-    return { ok: true, sessions, note: `${sessions.length} session(s)` };
+    // generated_at/stale: the daemon serves a background-built snapshot and says
+    // how old it is. Older daemons omit both; that reads as fresh.
+    return {
+      ok: true,
+      sessions,
+      note: `${sessions.length} session(s)`,
+      generatedAt: typeof body.generated_at === "number" ? body.generated_at * 1000 : null,
+      daemonStale: body.stale === true,
+    };
   } catch (error) {
     const why = error && error.name === "AbortError"
       ? `daemon did not answer within ${Math.round(timeoutMs / 1000)}s`
@@ -132,4 +140,125 @@ function sessionsBrief(result, { max = 15 } = {}) {
   );
 }
 
-module.exports = { listSessions, tailTranscript, harnessToken, sessionsBrief, DAEMON };
+function agoLabel(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 90) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  return m < 90 ? `${m}m ago` : `${Math.round(m / 60)}h ago`;
+}
+
+/**
+ * ONE main-process poller that Home, the Sessions pane and the Command agent all
+ * read (2026-09-27). Each used to fetch on its own with a 3 s abort, so a daemon
+ * busy for 4 s put "daemon did not answer within 3s" on Home while the Sessions
+ * pane, polling separately, showed rows. Now one loop fetches every `intervalMs`
+ * with a generous `timeoutMs`, keeps the last GOOD read with its timestamp, and
+ * every reader gets the same view:
+ *
+ *  - fresh read            -> { ok:true, sessions, stale:false }
+ *  - failed after a good   -> { ok:true, sessions: lastGood, stale:true,
+ *                               note: "last known N sessions (Ns ago) — <why>" }
+ *  - never a good read     -> { ok:false, note } (the only error a reader shows)
+ *
+ * Reads never wait on the network once one answer exists; the first read waits
+ * for the first fetch (bounded by `timeoutMs`).
+ */
+function createSessionsPoller({
+  list = listSessions,
+  intervalMs = 3000,
+  timeoutMs = 20000,
+  now = Date.now,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+} = {}) {
+  let lastGood = null; // { sessions, at, generatedAt }
+  let last = null; // the latest listSessions() result, good or not
+  let inflight = null;
+  let timer = null;
+  let running = false;
+
+  function tick() {
+    if (inflight) return inflight;
+    inflight = Promise.resolve()
+      .then(() => list({ timeoutMs }))
+      .catch((error) => ({ ok: false, sessions: [], note: String((error && error.message) || error) }))
+      .then((result) => {
+        last = result || { ok: false, sessions: [], note: "no answer" };
+        if (last.ok) {
+          lastGood = { sessions: last.sessions || [], at: now(), generatedAt: last.generatedAt || null };
+        }
+        return view();
+      })
+      .finally(() => {
+        inflight = null;
+        if (running) {
+          if (timer) clearTimer(timer);
+          timer = setTimer(tick, intervalMs);
+          if (timer && typeof timer.unref === "function") timer.unref();
+        }
+      });
+    return inflight;
+  }
+
+  /** The current view, without touching the network. null = nothing read yet. */
+  function view() {
+    if (!last && !lastGood) return null;
+    if (last && last.ok) {
+      return { ...last, stale: Boolean(last.daemonStale), at: lastGood.at, ageMs: now() - lastGood.at };
+    }
+    if (lastGood) {
+      const ageMs = now() - lastGood.at;
+      const n = lastGood.sessions.length;
+      const why = (last && last.note) ? ` — ${last.note}` : "";
+      return {
+        ok: true,
+        sessions: lastGood.sessions,
+        stale: true,
+        at: lastGood.at,
+        ageMs,
+        staleNote: `last known ${n} session${n === 1 ? "" : "s"} (${agoLabel(ageMs)})`,
+        note: `last known ${n} session${n === 1 ? "" : "s"} (${agoLabel(ageMs)})${why}`,
+      };
+    }
+    return { ...last, stale: false };
+  }
+
+  /** Start the loop (idempotent). */
+  function start() {
+    if (running) return;
+    running = true;
+    void tick();
+  }
+
+  function stop() {
+    running = false;
+    if (timer) clearTimer(timer);
+    timer = null;
+  }
+
+  /** The shared view; starts the loop and waits only when nothing was ever read. */
+  async function get() {
+    start();
+    return view() || (await (inflight || tick()));
+  }
+
+  return { start, stop, get, view, refresh: tick };
+}
+
+let shared = null;
+/** The process-wide poller every sessions reader in main shares. */
+function sharedSessionsPoller() {
+  if (!shared) shared = createSessionsPoller();
+  return shared;
+}
+
+module.exports = {
+  listSessions,
+  tailTranscript,
+  harnessToken,
+  sessionsBrief,
+  createSessionsPoller,
+  sharedSessionsPoller,
+  agoLabel,
+  DAEMON,
+};

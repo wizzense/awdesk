@@ -41,9 +41,11 @@ function createHomeIpc({
     homeIpcWired = true;
     const { buildHomeSummary, HOME_COMMANDS, planHomeSet } = require("./home-summary.cjs");
     ipcMain.handle("desk:home-summary", async () => {
-      const { listSessions } = require("./sessions-client.cjs");
+      // The shared main-process poller (sessions-client.cjs): a slow daemon
+      // shows as "last known N sessions (Ns ago)", never as a 3 s timeout error.
+      const { sharedSessionsPoller } = require("./sessions-client.cjs");
       const [sessions, gateway] = await Promise.all([
-        listSessions({ timeoutMs: 3000 }).catch((error) => ({ ok: false, note: String(error?.message || error) })),
+        sharedSessionsPoller().get().catch((error) => ({ ok: false, note: String(error?.message || error) })),
         probeGateway(),
       ]);
       return buildHomeSummary({

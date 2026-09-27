@@ -36,7 +36,8 @@ const URGENCY_RANK = { critical: 0, high: 1, normal: 2, low: 3 };
  * @param {object} input
  * @param {Array}  input.cards        open decision cards (decision-cards.cardFromRaw shape)
  * @param {(card) => string} [input.triage]  decision-cards.triageCard; "decision" = actionable
- * @param {object} [input.sessions]   sessions-client.listSessions() result {ok, sessions, note}
+ * @param {object} [input.sessions]   the shared sessions poller's view
+ *                                    {ok, sessions, note, stale?, staleNote?}
  * @param {object} [input.voice]      { voicesMuted, micMuted, talkMode, doNotDisturb }
  * @param {object} [input.avatars]    { shown, bodies, character }
  * @param {object} [input.gateway]    { ok, note } -- the MCP gateway health probe
@@ -71,6 +72,10 @@ function buildHomeSummary({ cards = [], triage, sessions, voice = {}, avatars = 
     sessionBlock = {
       ok: true,
       total: sessions.sessions.length,
+      // A stale block still shows its rows: "last known N (Ns ago)" is true and
+      // useful; an error is only for "never had a good read".
+      stale: Boolean(sessions.stale),
+      staleNote: sessions.stale ? String(sessions.staleNote || sessions.note || "last known sessions") : "",
       byStatus,
       recent: sessions.sessions.slice(0, 6).map((row) => ({
         id: String(row.id || ""),
@@ -89,6 +94,7 @@ function buildHomeSummary({ cards = [], triage, sessions, voice = {}, avatars = 
   const problems = [];
   if (gateway && gateway.ok === false) problems.push(`MCP gateway: ${gateway.note || "down"}`);
   if (!sessionBlock.ok) problems.push(`sessions: ${sessionBlock.note}`);
+  else if (sessionBlock.stale) problems.push(`sessions: ${sessionBlock.staleNote}`);
   const health = problems.length
     ? { level: "warn", text: problems.join(" · ") }
     : { level: "ok", text: "Gateway and session daemon answering." };
