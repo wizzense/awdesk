@@ -58,6 +58,24 @@ test("sessions are summarised by status and capped at six", () => {
   assert.equal(out.sessions.recent.length, 6);
 });
 
+test("stale sessions keep their rows and say 'last known N (Ns ago)', never an error", () => {
+  const rows = [{ id: "a", status: "working" }, { id: "b", status: "idle" }];
+  const out = buildHomeSummary({
+    sessions: { ok: true, sessions: rows, stale: true, staleNote: "last known 2 sessions (40s ago)" },
+    gateway: { ok: true },
+    now: NOW,
+  });
+  assert.equal(out.sessions.ok, true);
+  assert.equal(out.sessions.total, 2);
+  assert.equal(out.sessions.stale, true);
+  assert.equal(out.sessions.staleNote, "last known 2 sessions (40s ago)");
+  assert.equal(out.health.text, "sessions: last known 2 sessions (40s ago)");
+  assert.doesNotMatch(out.health.text, /did not answer/);
+  const fresh = buildHomeSummary({ sessions: { ok: true, sessions: rows }, gateway: { ok: true }, now: NOW });
+  assert.equal(fresh.sessions.stale, false);
+  assert.equal(fresh.health.level, "ok");
+});
+
 test("voice switches pass through as booleans", () => {
   const out = buildHomeSummary({ voice: { voicesMuted: 1, micMuted: 0, talkMode: "open" }, now: NOW });
   assert.deepEqual(out.voice, { voicesMuted: true, micMuted: false, talkMode: "open", doNotDisturb: false });

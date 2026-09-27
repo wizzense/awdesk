@@ -35,7 +35,9 @@ function ensureSessionsIpc() {
   wired = true;
   const { ipcMain } = electron();
   const sessions = require("./sessions-client.cjs");
-  ipcMain.handle("desk:sessions-list", () => sessions.listSessions());
+  // The shared poller: the pane and Home read the SAME last-good view, so they
+  // can no longer disagree about whether the daemon answered.
+  ipcMain.handle("desk:sessions-list", () => sessions.sharedSessionsPoller().get());
   ipcMain.handle("desk:sessions-tail", (_event, _sessionId, transcriptPath) =>
     sessions.tailTranscript(transcriptPath));
 }
