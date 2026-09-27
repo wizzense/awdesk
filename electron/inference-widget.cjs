@@ -22,7 +22,9 @@
  * shared cases so the two cannot drift silently.
  */
 
-const DEFAULT_BASE = "https://aitherium.com";
+// The API origin. aitherium.com is the static Pages export and answers /api/* with 404
+// (measured 2026-09-27: the widget read "pulse HTTP 404"); api.aitherium.com serves Veil.
+const DEFAULT_BASE = "https://api.aitherium.com";
 const ACTIONS = Object.freeze(["restart", "reprobe", "logs"]);
 const CONFIRM_FIRST = new Set(["restart"]);
 const TARGET_RE = /^[A-Za-z0-9][A-Za-z0-9:_.-]{0,95}$/;
