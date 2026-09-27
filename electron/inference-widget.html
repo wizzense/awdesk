@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;" />
+<title>Aither Inference Ops</title>
+<style>
+  :root {
+    --bg: #0f1218; --panel: #171b24; --line: #262c3a; --fg: #e6e9f0; --muted: #8a93a6;
+    --up: #2fbf71; --down: #e5484d; --warn: #f5a524; --unknown: #6b7280; --btn: #222838; --btn-hi: #2c3447;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 12px/1.35 system-ui, "Segoe UI", sans-serif; }
+  body { display: grid; grid-template-rows: auto auto 1fr auto; height: 100vh; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  header { -webkit-app-region: drag; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  header .t { font-weight: 600; letter-spacing: .02em; }
+  header .s { color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header button { -webkit-app-region: no-drag; }
+  button { background: var(--btn); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font: inherit; cursor: pointer; }
+  button:hover { background: var(--btn-hi); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.arm { border-color: var(--down); color: var(--down); }
+  #alerts { padding: 6px 10px; display: grid; gap: 4px; }
+  .alert { border-left: 3px solid var(--unknown); background: var(--panel); padding: 4px 6px; border-radius: 4px; display: flex; gap: 6px; align-items: center; }
+  .alert.critical { border-color: var(--down); } .alert.warning { border-color: var(--warn); }
+  .alert .x { flex: 1; }
+  main { overflow: auto; padding: 4px 10px 8px; }
+  .node { margin-top: 8px; }
+  .node .h { display: flex; justify-content: space-between; color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: .08em; }
+  .m { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unknown); }
+  .dot.serving { background: var(--up); } .dot.down { background: var(--down); }
+  .m .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m .l { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .m .a { display: flex; gap: 3px; }
+  .retiring { opacity: .55; }
+  footer { display: flex; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--line); color: var(--muted); align-items: center; }
+  footer .msg { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  pre#logs { display: none; position: fixed; inset: 40px 8px 40px 8px; margin: 0; padding: 8px; overflow: auto; background: #0b0e13;
+    border: 1px solid var(--line); border-radius: 8px; font: 11px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <span class="t">Inference</span><span class="s" id="summary">polling…</span>
+  <button id="refresh" title="Refresh">&#x21bb;</button>
+  <button id="web" title="Open the full board in the browser">&#x2197;</button>
+  <button id="close" title="Close">&#x2715;</button>
+</header>
+<section id="alerts"></section>
+<main id="nodes"></main>
+<footer><span class="msg" id="msg"></span><button id="login" hidden>Sign in</button></footer>
+<pre id="logs"></pre>
+<script>
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const POLL_MS = 15000;
+  const LABEL = { restart: "Restart", reprobe: "Probe", logs: "Logs" };
+  let armed = null; // "restart:<key>" armed by a first click; a second click within 4 s confirms
+  let armTimer = null;
+
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function n(v, suf) { return typeof v === "number" ? `${Math.round(v)}${suf || ""}` : "–"; }
+  function say(text) { $("msg").textContent = text || ""; }
+
+  function actionButton(action, target) {
+    const b = el("button", "", LABEL[action]);
+    b.dataset.action = action; b.dataset.target = target;
+    b.title = `${LABEL[action]} ${target}`;
+    b.addEventListener("click", () => onAction(b, action, target));
+    return b;
+  }
+
+  async function onAction(button, action, target) {
+    const id = `${action}:${target}`;
+    let opts = {};
+    if (action === "restart") {
+      if (armed !== id) {
+        armed = id; button.classList.add("arm"); button.textContent = "Confirm?";
+        clearTimeout(armTimer);
+        armTimer = setTimeout(() => { armed = null; render(lastSnap); }, 4000);
+        return;
+      }
+      armed = null; clearTimeout(armTimer);
+      opts = { confirm: true };
+    }
+    document.querySelectorAll("button[data-action]").forEach((b) => { b.disabled = true; });
+    say(`${LABEL[action]} ${target}…`);
+    const v = await window.inferenceOps.act(action, target, opts);
+    if (v.signedOut) { $("login").hidden = false; say("Sign in to aitherium.com to act."); }
+    else if (v.forbidden) say(`Refused: ${v.error}`);
+    else if (!v.ok) say(`${LABEL[action]} ${target} failed: ${v.error || "HTTP " + v.status}`);
+    else if (action === "logs") showLogs(target, v.entries || []);
+    else if (action === "reprobe") say(`${target}: ${(v.result && v.result.state) || "probed"}${v.result && v.result.latency_ms != null ? ` (${v.result.latency_ms} ms)` : ""}`);
+    else say(`Restart sent for ${target}${v.container ? ` (${v.container})` : ""}`);
+    await refresh();
+  }
+
+  function showLogs(target, entries) {
+    const pre = $("logs");
+    pre.textContent = `${target} — ${entries.length} entries (click to close)\n\n` +
+      (entries.length ? entries.map((e) => `${e.timestamp || ""} ${e.level || ""} ${e.message || ""}`).join("\n")
+        : "Chronicle holds no entries for this container.");
+    pre.style.display = "block";
+  }
+  $("logs").addEventListener("click", () => { $("logs").style.display = "none"; });
+
+  let lastSnap = null;
+  function render(snap) {
+    lastSnap = snap;
+    const alerts = $("alerts"); const nodes = $("nodes");
+    alerts.replaceChildren(); nodes.replaceChildren();
+    if (!snap) return;
+    if (!snap.ok) { $("summary").textContent = `could not poll: ${snap.error}`; return; }
+    if (!snap.reported) { $("summary").textContent = "inference topology not reported"; return; }
+    const models = snap.rows.flatMap((r) => r.models);
+    const serving = models.filter((m) => m.state === "serving").length;
+    $("summary").textContent = `${serving}/${models.length} serving · ${snap.measured_at ? new Date(snap.measured_at).toLocaleTimeString() : "?"}`;
+    for (const a of snap.alerts.filter((x) => x.severity !== "info").slice(0, 4)) {
+      const row = el("div", `alert ${a.severity}`);
+      row.append(el("span", "x", a.title));
+      if (a.target) for (const act of a.actions.slice(0, 2)) row.append(actionButton(act, a.target));
+      alerts.append(row);
+    }
+    for (const node of snap.rows) {
+      const box = el("div", "node");
+      const h = el("div", "h");
+      h.append(el("span", "", node.label));
+      h.append(el("span", "", node.vram ? `${n(node.vram.used)}/${n(node.vram.total)} GB` : node.status || ""));
+      box.append(h);
+      for (const m of node.models) {
+        const row = el("div", `m${m.retiring ? " retiring" : ""}`);
+        row.append(el("span", `dot ${m.state}`));
+        const name = el("span", "n", m.name); name.title = `${m.key}${m.engine ? " · " + m.engine : ""}${m.retiring ? " · retiring" : ""}`;
+        row.append(name);
+        row.append(el("span", "l", m.state === "serving" ? `${n(m.running)}r ${n(m.waiting)}w ${n(m.kv, "%")}` : m.state));
+        const acts = el("span", "a");
+        for (const act of m.actions || ["reprobe"]) acts.append(actionButton(act, m.key));
+        row.append(acts);
+        box.append(row);
+      }
+      nodes.append(box);
+    }
+    if (armed) {
+      const [act, ...rest] = armed.split(":");
+      const b = document.querySelector(`button[data-action="${act}"][data-target="${CSS.escape(rest.join(":"))}"]`);
+      if (b) { b.classList.add("arm"); b.textContent = "Confirm?"; }
+    }
+  }
+
+  async function refresh() { render(await window.inferenceOps.poll()); }
+
+  $("refresh").addEventListener("click", () => void refresh());
+  $("web").addEventListener("click", () => window.inferenceOps.openWeb("board"));
+  $("login").addEventListener("click", () => window.inferenceOps.openWeb("login"));
+  $("close").addEventListener("click", () => window.inferenceOps.close());
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if ($("logs").style.display === "block") $("logs").style.display = "none"; else window.inferenceOps.close(); } });
+  void refresh();
+  setInterval(() => { if (!armed) void refresh(); }, POLL_MS);
+</script>
+</body>
+</html>

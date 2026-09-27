@@ -395,6 +395,13 @@ const COMMANDS = Object.freeze([
     id: "fleet.open", label: "Fleet window…", group: "fleet",
     surfaces: ["tray", "palette"], fleet: "open_panel",
   }),
+  // The inference widget (owner, 2026-09-27): a compact always-on-top list of
+  // every inference node and model with live load, and Restart / Probe / Logs
+  // through the same Veil actions API the web board /workspace/ops uses.
+  Object.freeze({
+    id: "inference.open", label: "Inference ops widget…", group: "fleet",
+    surfaces: ["tray", "palette"],
+  }),
   Object.freeze({
     id: "fleet.gaming", label: "GPU quiet (game on)", group: "fleet",
     surfaces: ["tray", "palette"], fleet: "gaming", destructive: true,
