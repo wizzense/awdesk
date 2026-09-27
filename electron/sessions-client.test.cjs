@@ -247,3 +247,133 @@ test("every main-process sessions reader goes through the shared poller", () => 
     assert.doesNotMatch(src, /listSessions\(/, `${file} must not fetch on its own`);
   }
 });
+
+// ── sessions S1: the verbs ────────────────────────────────────────────────────
+
+function recordingFetch(responses) {
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    calls.push({ url, opts });
+    const { status = 200, body = {} } = responses.shift() || {};
+    return { status, ok: status >= 200 && status < 300, json: async () => body };
+  };
+  return { calls, fetchImpl };
+}
+
+async function withToken(fn) {
+  process.env.AITHER_HARNESS_TOKEN = "test-token";
+  try { return await fn(); } finally { delete process.env.AITHER_HARNESS_TOKEN; }
+}
+
+test("messageSession POSTs trimmed text to /message with the bearer", async () => {
+  const { messageSession } = require("./sessions-client.cjs");
+  await withToken(async () => {
+    const { calls, fetchImpl } = recordingFetch([{ body: { ok: true, delivered_at: "next-prompt" } }]);
+    const r = await messageSession("abc-123", "  look at CI  ", { fetchImpl });
+    assert.equal(r.ok, true);
+    assert.equal(r.body.delivered_at, "next-prompt");
+    assert.match(calls[0].url, /\/sessions\/abc-123\/message$/);
+    assert.equal(calls[0].opts.method, "POST");
+    assert.equal(calls[0].opts.headers.Authorization, "Bearer test-token");
+    assert.deepEqual(JSON.parse(calls[0].opts.body), { text: "look at CI" });
+  });
+});
+
+test("a refused verb carries the daemon's own detail, never a bare failure", async () => {
+  const { focusSession, interruptSession } = require("./sessions-client.cjs");
+  await withToken(async () => {
+    const { fetchImpl } = recordingFetch([
+      { status: 403, body: { detail: "focus is local only" } },
+      { status: 404, body: { detail: "no such session" } },
+    ]);
+    const f = await focusSession("abc", { fetchImpl });
+    assert.equal(f.ok, false);
+    assert.equal(f.note, "focus is local only");
+    const i = await interruptSession("abc", { fetchImpl });
+    assert.equal(i.note, "no such session");
+  });
+});
+
+test("a session id that is not a plain token never reaches a URL", async () => {
+  const { messageSession, focusSession, interruptSession } = require("./sessions-client.cjs");
+  await withToken(async () => {
+    const { calls, fetchImpl } = recordingFetch([]);
+    for (const bad of ["../x", "a/b", "", "..", "a b"]) {
+      assert.equal((await messageSession(bad, "hi", { fetchImpl })).ok, false);
+      assert.equal((await focusSession(bad, { fetchImpl })).ok, false);
+      assert.equal((await interruptSession(bad, { fetchImpl })).ok, false);
+    }
+    assert.equal(calls.length, 0);
+    // ...and an empty message is refused before the network too.
+    assert.equal((await messageSession("abc", "   ", { fetchImpl })).note, "type a message first");
+    assert.equal(calls.length, 0);
+  });
+});
+
+test("spawnSession sends harness + cwd; listHarnesses keeps installed ones only", async () => {
+  const { spawnSession, listHarnesses } = require("./sessions-client.cjs");
+  await withToken(async () => {
+    const { calls, fetchImpl } = recordingFetch([
+      { body: { id: "new1" } },
+      { body: { harnesses: [
+        { id: "claude", label: "Claude Code", installed: true },
+        { id: "gemini", label: "Gemini", installed: false },
+      ] } },
+    ]);
+    const r = await spawnSession({ cwd: "C:\\w", harness: "claude" }, { fetchImpl });
+    assert.equal(r.body.id, "new1");
+    assert.match(calls[0].url, /\/sessions$/);
+    assert.deepEqual(JSON.parse(calls[0].opts.body), { harness: "claude", cwd: "C:\\w", title: "" });
+    const h = await listHarnesses({ fetchImpl });
+    assert.deepEqual(h.harnesses, [{ id: "claude", label: "Claude Code" }]);
+  });
+});
+
+test("defaultSessionCwd: env first, then the main checkout when it exists, else home", () => {
+  const { defaultSessionCwd } = require("./sessions-client.cjs");
+  assert.equal(defaultSessionCwd({ env: { AITHER_SESSION_CWD: "X:\\y" } }), "X:\\y");
+  assert.equal(defaultSessionCwd({ env: {}, exists: () => false }), os.homedir());
+  if (process.platform === "win32") {
+    assert.equal(defaultSessionCwd({ env: {}, exists: () => true }), "C:\\AitherOS-Fresh");
+  }
+});
+
+test("verb handlers refresh the shared poller only after a verb that succeeded", async () => {
+  const { sessionVerbHandlers } = require("./sessions-window.cjs");
+  let refreshed = 0;
+  const fake = {
+    sharedSessionsPoller: () => ({ refresh: () => { refreshed += 1; return Promise.resolve(); } }),
+    messageSession: async (id, text) => ({ ok: id === "good", note: text }),
+    focusSession: async () => ({ ok: true }),
+    interruptSession: async () => ({ ok: false, note: "discovered" }),
+    spawnSession: async (opts) => ({ ok: true, body: opts }),
+    listHarnesses: async () => ({ ok: true, harnesses: [] }),
+    defaultSessionCwd: () => "D:\\home",
+  };
+  const h = sessionVerbHandlers(fake);
+  assert.deepEqual(Object.keys(h).sort(), [
+    "desk:sessions-focus", "desk:sessions-harnesses", "desk:sessions-interrupt",
+    "desk:sessions-message", "desk:sessions-spawn",
+  ]);
+  await h["desk:sessions-message"](null, "good", "hi");
+  await h["desk:sessions-message"](null, "bad", "hi");
+  await h["desk:sessions-interrupt"](null, "x");
+  assert.equal(refreshed, 1);
+  const spawned = await h["desk:sessions-spawn"](null, { harness: "", cwd: "" });
+  assert.deepEqual(spawned.body, { cwd: "D:\\home", harness: "claude" });
+  assert.equal((await h["desk:sessions-harnesses"]()).defaultCwd, "D:\\home");
+});
+
+test("the pane offers exactly the four verbs through its preload, and renders why_not", () => {
+  const preload = fs.readFileSync(path.join(__dirname, "sessions-preload.cjs"), "utf8");
+  for (const ch of ["desk:sessions-message", "desk:sessions-focus", "desk:sessions-interrupt",
+    "desk:sessions-spawn", "desk:sessions-harnesses"]) {
+    assert.match(preload, new RegExp(ch), `${ch} is bridged`);
+  }
+  const page = fs.readFileSync(path.join(__dirname, "sessions.html"), "utf8");
+  assert.match(page, /why_not/, "a disabled verb must carry the daemon's reason");
+  assert.match(page, /id="newSession"/);
+  assert.match(page, /last_prompt/);
+  // Model/transcript text is data: the verbs must not introduce innerHTML writes of row content.
+  assert.doesNotMatch(page, /innerHTML\s*=\s*[^"'\s]/);
+});

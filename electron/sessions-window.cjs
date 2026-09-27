@@ -40,6 +40,39 @@ function ensureSessionsIpc() {
   ipcMain.handle("desk:sessions-list", () => sessions.sharedSessionsPoller().get());
   ipcMain.handle("desk:sessions-tail", (_event, _sessionId, transcriptPath) =>
     sessions.tailTranscript(transcriptPath));
+  for (const [channel, handler] of Object.entries(sessionVerbHandlers(sessions))) {
+    ipcMain.handle(channel, handler);
+  }
+}
+
+/**
+ * The four verbs plus the harness list, as `{ channel: (event, ...args) => result }`.
+ * A verb that changed something refreshes the SHARED poller, so the pane, Home
+ * and the Command agent see the new state on their next read instead of up to
+ * one poll interval later. Pure (the client is injected) so it is testable
+ * without Electron.
+ */
+function sessionVerbHandlers(sessions) {
+  const after = async (promise) => {
+    const result = await promise;
+    if (result && result.ok) {
+      try { void sessions.sharedSessionsPoller().refresh(); } catch { /* a refresh is a courtesy */ }
+    }
+    return result;
+  };
+  return {
+    "desk:sessions-message": (_event, sessionId, text) => after(sessions.messageSession(sessionId, text)),
+    "desk:sessions-focus": (_event, sessionId) => sessions.focusSession(sessionId),
+    "desk:sessions-interrupt": (_event, sessionId) => after(sessions.interruptSession(sessionId)),
+    "desk:sessions-spawn": (_event, options) => after(sessions.spawnSession({
+      cwd: (options && options.cwd) || sessions.defaultSessionCwd(),
+      harness: (options && options.harness) || "claude",
+    })),
+    "desk:sessions-harnesses": async () => ({
+      ...(await sessions.listHarnesses()),
+      defaultCwd: sessions.defaultSessionCwd(),
+    }),
+  };
 }
 
 function createSessionsWindow() {
@@ -57,4 +90,6 @@ function isSessionsWindowOpen() {
   return Boolean(routeWindow(ROUTE));
 }
 
-module.exports = { ensureSessionsIpc, createSessionsWindow, closeSessionsWindow, isSessionsWindowOpen };
+module.exports = {
+  ensureSessionsIpc, sessionVerbHandlers, createSessionsWindow, closeSessionsWindow, isSessionsWindowOpen,
+};

@@ -38,6 +38,23 @@
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .row .sum { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ui-badge.exited { opacity: .55; }
+  /* Sessions S1: each row says what it is doing (task, status, where, last prompt,
+     how long ago) and what you can DO to it. A verb the daemon cannot honour is
+     disabled WITH the daemon's reason beside it, never hidden. */
+  .row .where { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+  .row .cwd { font-family: var(--font-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .row .prompt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--surface-300); }
+  .row .acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .row .why { font-size: 11px; color: var(--muted); }
+  .row .compose { display: grid; gap: 6px; }
+  .row .compose textarea { min-height: 54px; resize: vertical; font: inherit; }
+  .row .result { font-size: 11px; }
+  .row .result.bad { color: var(--bad); }
+  .row .result.good { color: var(--ok); }
+  #newBar { display: none; gap: 6px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+  #newBar.open { display: flex; }
+  #newBar .ui-input { flex: 1; min-width: 0; }
+  #newBar .ui-select { width: auto; min-width: 150px; }
 
   #side { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
   #tailBar { padding: 8px 14px; border-bottom: 1px solid var(--line); }
@@ -55,8 +72,16 @@
     <h1 class="title">Sessions</h1>
     <span class="ui-sub" id="state">loading…</span>
     <span class="ui-grow"></span>
+    <button class="ui-btn ui-small ui-primary" id="newSession">New session</button>
     <button class="ui-btn ui-small" id="refresh">Refresh</button>
   </header>
+  <div id="newBar" class="ui-row">
+    <select id="newHarness" class="ui-select" aria-label="Harness"><option value="claude">Claude Code</option></select>
+    <input id="newCwd" class="ui-input" aria-label="Working directory" placeholder="working directory" />
+    <button class="ui-btn ui-small ui-primary" id="newStart">Start</button>
+    <button class="ui-btn ui-small ui-ghost" id="newCancel">Cancel</button>
+    <span id="newNote" class="ui-note"></span>
+  </div>
   <main class="ui-body ui-flush">
     <div id="list"><div class="ui-empty">loading sessions…</div></div>
     <div id="side">
@@ -70,10 +95,10 @@
 
 <script>
 "use strict";
-// The Sessions pane — slice 1 of COCKPIT-DESIGN: OBSERVE, never steer. Rows
-// carry each session's steer_capability so a later slice can honestly enable
-// steering only where the daemon can deliver it. All content is rendered with
-// textContent: a transcript is model output and is DATA, never markup.
+// The Sessions pane. Slice 1 observed; sessions S1 adds the verbs, and ONLY the
+// ones the daemon's per-row `actions` allows -- a disabled verb shows the
+// daemon's own why_not text. All content is rendered with textContent: a
+// transcript is model output and is DATA, never markup.
 
 const listEl = document.getElementById("list");
 const stateEl = document.getElementById("state");
@@ -143,6 +168,165 @@ function groupOf(session) {
 }
 const GROUP_LABELS = { needs: "Needs you", working: "Working", quiet: "Quiet" };
 
+/** "C:\a\b\repo" -> "repo": the checkout a session works in, at a glance. */
+function baseName(p) {
+  const parts = String(p || "").split(/[\\/]+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "";
+}
+
+/** The session's own short name, else the title's first segment, else its id. */
+function taskName(s) {
+  const split = splitTitle(s.title);
+  return String(s.name || "").trim() || split.where || split.about || String(s.id || "").slice(0, 8);
+}
+
+/** The daemon's verdict for one verb: { can, why }. An older daemon sends no
+ *  `actions`; then nothing is offered, and the reason says so. */
+function verb(s, name) {
+  const a = s && s.actions;
+  if (!a || typeof a !== "object") return { can: false, why: "this daemon predates session verbs -- restart it" };
+  const why = (a.why_not && a.why_not[name]) || "";
+  return { can: a[name] === true, why };
+}
+
+let composeFor = null; // session id whose inline message box is open
+let draft = "";
+const results = {}; // session id -> { text, good }
+
+function actButton(label, s, name, onClick, cls) {
+  const v = verb(s, name);
+  const b = document.createElement("button");
+  b.className = "ui-btn ui-small" + (cls ? " " + cls : "");
+  b.textContent = label;
+  b.dataset.verb = name;
+  b.disabled = !v.can;
+  if (!v.can) b.title = v.why;
+  b.addEventListener("click", (ev) => { ev.stopPropagation(); if (v.can) onClick(); });
+  return b;
+}
+
+function note(id, text, good) {
+  results[id] = { text, good };
+  renderList();
+}
+
+async function doFocus(s) {
+  const r = await window.aitherSessions.focus(s.id);
+  const body = (r && r.body) || {};
+  const extra = body.remote_url ? " -- also at " + body.remote_url : "";
+  const good = Boolean(r && r.ok && body.ok !== false);
+  note(s.id, r && r.ok ? (body.detail || "focused") + extra : "focus: " + ((r && r.note) || "failed"), good);
+}
+
+async function doInterrupt(s) {
+  const r = await window.aitherSessions.interrupt(s.id);
+  note(s.id, r && r.ok ? "interrupted" : "interrupt: " + ((r && r.note) || "failed"), Boolean(r && r.ok));
+}
+
+async function doSend(s, text) {
+  const r = await window.aitherSessions.message(s.id, text);
+  if (r && r.ok) {
+    composeFor = null;
+    draft = "";
+    note(s.id, "queued -- delivered at its next prompt", true);
+  } else {
+    note(s.id, "message: " + ((r && r.note) || "failed"), false);
+  }
+}
+
+function buildRow(s) {
+  const row = document.createElement("div");
+  row.className = "row" + (selected && selected.id === s.id ? " sel" : "");
+  row.dataset.id = String(s.id || "");
+  const top = document.createElement("div");
+  top.className = "top";
+  const name = document.createElement("span");
+  name.className = "name";
+  name.textContent = taskName(s);
+  name.title = (s.cwd || "") + (s.harness_label ? " · " + s.harness_label : "") + (s.origin ? " · " + s.origin : "");
+  const age = document.createElement("span");
+  age.className = "age ui-note";
+  age.textContent = ageOf(s.last_activity_at);
+  age.title = "last activity";
+  top.append(name, pill(String(s.status || "?"), statusClass(s.status)), age);
+  row.appendChild(top);
+
+  const where = document.createElement("div");
+  where.className = "where";
+  const cwd = document.createElement("span");
+  cwd.className = "cwd";
+  cwd.textContent = baseName(s.cwd) || "?";
+  cwd.title = s.cwd || "";
+  const prompt = document.createElement("span");
+  prompt.className = "prompt ui-note";
+  const said = String(s.last_prompt || "").trim() || splitTitle(s.title).about || "";
+  prompt.textContent = said ? "\u201c" + said + "\u201d" : "";
+  prompt.title = said;
+  where.append(cwd, prompt);
+  row.appendChild(where);
+
+  if (s.last_activity_summary) {
+    const sum = document.createElement("div");
+    sum.className = "sum ui-meta ui-note";
+    sum.textContent = s.last_activity_summary;
+    row.appendChild(sum);
+  }
+
+  const acts = document.createElement("div");
+  acts.className = "acts";
+  acts.append(
+    actButton("Focus", s, "focus", () => void doFocus(s)),
+    actButton("Message", s, "message", () => {
+      composeFor = composeFor === s.id ? null : s.id;
+      renderList();
+      const box = listEl.querySelector('.row[data-id="' + CSS.escape(String(s.id)) + '"] textarea');
+      if (box) box.focus();
+    }),
+    actButton("Interrupt", s, "interrupt", () => void doInterrupt(s), "ui-danger"),
+    steerPill(s.steer_capability),
+  );
+  row.appendChild(acts);
+  // The first disabled verb's reason, in words: a greyed button alone says nothing.
+  const blocked = ["interrupt", "message", "focus"].map((n) => verb(s, n)).find((v) => !v.can && v.why);
+  if (blocked) {
+    const why = document.createElement("div");
+    why.className = "why";
+    why.textContent = blocked.why;
+    row.appendChild(why);
+  }
+
+  if (composeFor === s.id) {
+    const compose = document.createElement("div");
+    compose.className = "compose";
+    const box = document.createElement("textarea");
+    box.className = "ui-input";
+    box.placeholder = "Queued for its next prompt (Ctrl+Enter sends, Esc closes)";
+    box.value = draft;
+    box.addEventListener("input", () => { draft = box.value; });
+    box.addEventListener("click", (ev) => ev.stopPropagation());
+    const send = document.createElement("button");
+    send.className = "ui-btn ui-small ui-primary";
+    send.textContent = "Send";
+    const go = () => { if (box.value.trim()) void doSend(s, box.value); };
+    send.addEventListener("click", (ev) => { ev.stopPropagation(); go(); });
+    box.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); go(); }
+      if (ev.key === "Escape") { composeFor = null; renderList(); }
+    });
+    compose.append(box, send);
+    row.appendChild(compose);
+  }
+  const res = results[s.id];
+  if (res) {
+    const r = document.createElement("div");
+    r.className = "result " + (res.good ? "good" : "bad");
+    r.textContent = res.text;
+    row.appendChild(r);
+  }
+  row.addEventListener("click", () => select(s));
+  return row;
+}
+
 function renderList() {
   listEl.textContent = "";
   if (!sessions.length) {
@@ -169,29 +353,7 @@ function renderList() {
       heading.appendChild(n);
       listEl.appendChild(heading);
     }
-    const row = document.createElement("div");
-    row.className = "row" + (selected && selected.id === s.id ? " sel" : "");
-    const top = document.createElement("div");
-    top.className = "top";
-    const name = document.createElement("span");
-    name.className = "name";
-    const split = splitTitle(s.title);
-    name.textContent = split.about || String(s.id || "").slice(0, 8);
-    name.title = (s.cwd || "") + (s.harness_label ? " · " + s.harness_label : "") + (s.origin ? " · " + s.origin : "");
-    const age = document.createElement("span");
-    age.className = "age ui-note";
-    age.textContent = ageOf(s.last_activity_at);
-    top.append(name, pill(String(s.status || "?"), statusClass(s.status)), age);
-    const sum = document.createElement("div");
-    sum.className = "sum ui-meta ui-note";
-    sum.textContent = [split.where, s.last_activity_summary || s.cwd || ""].filter(Boolean).join("  ·  ");
-    row.append(top, sum);
-    const badges = document.createElement("div");
-    badges.className = "top";
-    badges.append(steerPill(s.steer_capability));
-    row.appendChild(badges);
-    row.addEventListener("click", () => select(s));
-    listEl.appendChild(row);
+    listEl.appendChild(buildRow(s));
   }
 }
 
@@ -269,6 +431,8 @@ async function refreshList() {
     }
     sessions = result.sessions || [];
     say(result.note + " — " + new Date().toLocaleTimeString());
+    // A poll must not rebuild the row under someone typing a message.
+    if (composeFor && document.activeElement && document.activeElement.tagName === "TEXTAREA") return;
     if (!selected && sessions.length) {
       // Land on the session most likely to be the reason the pane was opened.
       const first = ["needs", "working", "quiet"].map((g) => sessions.find((x) => groupOf(x) === g)).find(Boolean);
@@ -295,6 +459,43 @@ async function refreshTail() {
 }
 
 document.getElementById("refresh").addEventListener("click", () => { void refreshList(); void refreshTail(); });
+
+const newBar = document.getElementById("newBar");
+const newHarness = document.getElementById("newHarness");
+const newCwd = document.getElementById("newCwd");
+const newNote = document.getElementById("newNote");
+document.getElementById("newSession").addEventListener("click", async () => {
+  newBar.classList.toggle("open");
+  if (!newBar.classList.contains("open")) return;
+  newNote.textContent = "";
+  const h = await window.aitherSessions.harnesses();
+  if (h && h.ok && h.harnesses.length) {
+    newHarness.textContent = "";
+    for (const { id, label } of h.harnesses) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = label;
+      if (id === "claude") opt.selected = true;
+      newHarness.appendChild(opt);
+    }
+  } else if (h && !h.ok) {
+    newNote.textContent = "harnesses: " + h.note;
+  }
+  if (!newCwd.value && h && h.defaultCwd) newCwd.value = h.defaultCwd;
+  newCwd.focus();
+});
+document.getElementById("newCancel").addEventListener("click", () => newBar.classList.remove("open"));
+document.getElementById("newStart").addEventListener("click", async () => {
+  newNote.textContent = "starting…";
+  const r = await window.aitherSessions.spawn({ cwd: newCwd.value.trim(), harness: newHarness.value });
+  if (r && r.ok) {
+    newNote.textContent = "started " + String((r.body && r.body.id) || "").slice(0, 8);
+    newBar.classList.remove("open");
+    void refreshList();
+  } else {
+    newNote.textContent = "could not start: " + ((r && r.note) || "failed");
+  }
+});
 
 void refreshList();
 setInterval(() => { void refreshList(); }, 5000);
