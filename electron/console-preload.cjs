@@ -48,6 +48,8 @@ if (pane === "settings.html") {
   require("./home-preload.cjs");
 } else if (pane === "cast.html") {
   require("./cast-preload.cjs");
+} else if (pane === "play.html") {
+  require("./play-preload.cjs");
 } else if (!href.includes("console.html")) {
   // The renderer bundle: ?deck=1 and ?chat=1 both live here. Loaded ONLY for
   // those frames, because preload.cjs also installs middle-drag window-move

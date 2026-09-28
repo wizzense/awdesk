@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Play</title>
+<link rel="stylesheet" href="aither-tokens.css" />
+<link rel="stylesheet" href="aither-ui.css" />
+<style>
+  /* Components come from aither-ui.css, colours from aither-tokens.css; layout only here. */
+  .embedded .bar .title { display: none; }
+  [hidden] { display: none !important; }
+  .cols { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .feed { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .line { padding: 6px 10px; border-radius: 8px; background: var(--surface-900); }
+  .line .who { font-weight: 600; margin-right: 6px; }
+  .line.you { align-self: flex-end; background: var(--surface-800, var(--surface-900)); }
+  .say { display: flex; gap: 8px; margin-top: 10px; }
+  .say input { flex: 1; }
+  .people { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow-y: auto; }
+  .person { cursor: pointer; user-select: none; }
+  .person.on { outline: 2px solid var(--brand); }
+  .checks { display: flex; flex-direction: column; gap: 4px; }
+  .code { font-size: 22px; letter-spacing: 3px; }
+</style>
+</head>
+<body class="ui">
+  <header class="ui-head bar">
+    <h1 class="title">Play</h1>
+    <span class="ui-sub" id="status">connecting…</span>
+    <span class="ui-grow"></span>
+    <span class="ui-note ui-bad" id="err" role="status"></span>
+    <button class="ui-btn ui-ghost ui-small" id="refresh">Refresh</button>
+  </header>
+
+  <main class="ui-body">
+    <div class="ui-stack">
+      <section class="ui-card" id="notSetUp" hidden>
+        <div class="ui-card-head"><h2>Not set up on this machine</h2></div>
+        <p class="ui-note" id="notSetUpText"></p>
+      </section>
+
+      <div class="cols">
+        <section class="ui-card">
+          <div class="ui-card-head">
+            <h2>Crimson Desert</h2>
+            <span class="ui-grow"></span>
+            <span class="ui-badge" id="gameBadge">—</span>
+          </div>
+          <div class="ui-row" style="gap:8px; flex-wrap:wrap">
+            <button class="ui-btn ui-primary" id="launch">Launch game</button>
+            <button class="ui-btn" id="setup">Install / repair mod</button>
+            <button class="ui-btn ui-ghost" id="doctor">Check everything</button>
+          </div>
+          <div class="checks ui-note" id="checks"></div>
+        </section>
+
+        <section class="ui-card">
+          <div class="ui-card-head">
+            <h2>Companions</h2>
+            <span class="ui-grow"></span>
+            <button class="ui-btn ui-primary ui-small" id="startStop">Start</button>
+          </div>
+          <p class="ui-note">Who comes along. Click to add or remove (up to 8).</p>
+          <div class="people" id="people"></div>
+          <p class="ui-note" id="connected"></p>
+        </section>
+      </div>
+
+      <section class="ui-card">
+        <div class="ui-card-head"><h2>Talk</h2><span class="ui-grow"></span>
+          <span class="ui-note" id="refused"></span></div>
+        <div class="feed" id="feed"><div class="ui-empty">Nothing said yet.</div></div>
+        <form class="say" id="sayForm">
+          <input class="ui-input" id="sayText" placeholder="Say something to your companions…" autocomplete="off" />
+          <select class="ui-select" id="sayTo"><option value="">everyone</option></select>
+          <button class="ui-btn ui-primary" type="submit">Say</button>
+        </form>
+      </section>
+
+      <section class="ui-card">
+        <div class="ui-card-head"><h2>Invite a friend</h2><span class="ui-grow"></span>
+          <button class="ui-btn ui-small" id="invite">New room code</button></div>
+        <div id="inviteOut" class="ui-note">Mints a Dark Matters room code a friend can join with.</div>
+      </section>
+    </div>
+  </main>
+
+<script>
+"use strict";
+const P = window.aitherPlay;
+const $ = (id) => document.getElementById(id);
+const err = (msg) => { $("err").textContent = msg || ""; };
+let state = null, members = [], party = [];
+
+function esc(s) { const d = document.createElement("div"); d.textContent = String(s ?? ""); return d.innerHTML; }
+
+function notSetUp(r) {
+  const show = r && r.notSetUp;
+  $("notSetUp").hidden = !show;
+  if (show) $("notSetUpText").textContent = r.error +
+    " Run the AitherOS game bridge setup once (python -m lib.integrations.game_bridge setup); after that the desk starts it by itself.";
+  return show;
+}
+
+function renderChecks(list) {
+  $("checks").innerHTML = (list || []).map((c) => {
+    const cls = c.status === "PASS" ? "ui-ok" : c.status === "FAIL" ? "ui-bad" : "ui-warn";
+    return `<div><span class="ui-badge ${cls}">${esc(c.status)}</span> <b>${esc(c.name)}</b> ${esc(c.detail)}` +
+      (c.status !== "PASS" && c.fix ? ` <span class="ui-note">→ ${esc(c.fix)}</span>` : "") + "</div>";
+  }).join("");
+}
+
+function renderPeople() {
+  $("people").innerHTML = members.map((m) =>
+    `<span class="ui-badge person ${party.includes(m.persona_id) ? "on" : ""}" data-id="${esc(m.persona_id)}"` +
+    ` title="${esc(m.voice ? "voice " + m.voice : "")}">${esc(m.name || m.persona_id)}</span>`).join("") ||
+    '<span class="ui-note">No personas found (export your party from Characters).</span>';
+  const to = $("sayTo"), keep = to.value;
+  to.innerHTML = '<option value="">everyone</option>' +
+    party.map((id) => `<option value="${esc(id)}">${esc((members.find((m) => m.persona_id === id) || {}).name || id)}</option>`).join("");
+  to.value = keep;
+}
+
+function renderState(s) {
+  state = s;
+  const running = !!(s && s.running);
+  $("startStop").textContent = running ? "Stop" : "Start";
+  $("status").textContent = running ? `companions running · ${s.connected.join(", ")}` : "companions stopped";
+  $("connected").textContent = running ? `Speaking through: ${s.connected.join(", ") || "console only"}` : "";
+  $("refused").textContent = s && s.refused_cloud ? `${s.refused_cloud} cloud answer(s) refused` : "";
+  const gameUp = running && s.connected.includes("crimson");
+  $("gameBadge").textContent = gameUp ? "in game" : "not connected";
+  $("gameBadge").className = "ui-badge " + (gameUp ? "ui-ok" : "ui-warn");
+  const said = (s && s.recent || []).filter((r) => r.event === "said");
+  $("feed").innerHTML = said.length ? said.map((r) => {
+    const who = (members.find((m) => m.persona_id === r.persona) || {}).name || r.persona;
+    return `<div class="line"><span class="who">${esc(who)}</span>${esc(r.text)}</div>`;
+  }).join("") : '<div class="ui-empty">Nothing said yet.</div>';
+  $("feed").scrollTop = $("feed").scrollHeight;
+  if (s && s.setup && s.setup.running) $("status").textContent = "installing the mod…";
+  else if (s && s.setup && s.setup.checks && s.setup.checks.length && s.setup.finished) renderChecks(s.setup.checks);
+}
+
+async function refresh() {
+  err("");
+  const c = await P.companions();
+  if (notSetUp(c)) { $("status").textContent = "not set up"; return; }
+  members = c.members || []; party = c.party || [];
+  renderPeople();
+  renderState(await P.state());
+}
+
+$("people").addEventListener("click", async (e) => {
+  const id = e.target.closest(".person")?.dataset.id; if (!id) return;
+  party = party.includes(id) ? party.filter((x) => x !== id) : [...party, id].slice(0, 8);
+  const r = await P.setParty(party); if (!r.ok) err(r.error);
+  renderPeople();
+  if (r.restart) err("Party saved — Stop and Start to bring the new party along.");
+});
+$("startStop").addEventListener("click", async () => {
+  const r = state && state.running ? await P.stop() : await P.start(party);
+  if (r.ok === false) err(r.error + (r.fix ? " — " + r.fix : ""));
+  refresh();
+});
+$("sayForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("sayText").value.trim(); if (!text) return;
+  $("sayText").value = "";
+  const r = await P.say(text, $("sayTo").value || undefined);
+  if (r.ok === false) err(r.error);
+  const line = document.createElement("div");
+  line.className = "line you"; line.innerHTML = `<span class="who">You</span>${esc(text)}`;
+  $("feed").querySelector(".ui-empty")?.remove(); $("feed").appendChild(line);
+});
+$("launch").addEventListener("click", async () => { const r = await P.launch(); if (r.ok === false) err(r.error); else $("status").textContent = "launching Crimson Desert…"; });
+$("setup").addEventListener("click", async () => { const r = await P.setup(); if (r.ok === false) err(r.error); else $("status").textContent = "installing the mod…"; });
+$("doctor").addEventListener("click", async () => {
+  $("checks").textContent = "checking…";
+  const r = await P.doctor();
+  if (r.ok === false) { err(r.error); return; }
+  renderChecks([...(r.install || []), ...(r.surfaces || [])]);
+});
+$("invite").addEventListener("click", async () => {
+  const r = await P.invite(24);
+  $("inviteOut").innerHTML = r.ok
+    ? `<div class="code ui-mono">${esc(r.code)}</div><div class="ui-note">${esc(r.link || "")}</div>`
+    : `<span class="ui-bad">${esc(r.error)}</span>`;
+});
+$("refresh").addEventListener("click", refresh);
+
+refresh();
+setInterval(async () => { if (!document.hidden) renderState(await P.state()); }, 4000);
+</script>
+</body>
+</html>

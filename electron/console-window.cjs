@@ -121,6 +121,15 @@ const PANES = Object.freeze([
     place: "avatars",
     kind: "file", file: "cast.html",
   }),
+  // Owner, 2026-09-27: "WHERE IS AITHER PLAY -- integrated in awdesk or aitherium.com??" Your
+  // companions riding along in your games (Crimson Desert first): launch, install/repair the
+  // mod, pick who comes, talk to them, mint a room code. kind:"file" -- no vite build. The
+  // service it drives lives outside the desk; play-service.cjs starts it on demand.
+  Object.freeze({
+    id: "play", label: "Play", hint: "Your companions, in your games", section: "Presence", icon: "users",
+    place: "play",
+    kind: "file", file: "play.html",
+  }),
   Object.freeze({
     id: "fleet", label: "Fleet", hint: "Containers, VRAM, doors", section: "Control", icon: "server",
     place: "fleet",
@@ -159,6 +168,7 @@ const PLACES = Object.freeze([
   Object.freeze({ id: "decisions", label: "Decisions", icon: "bell" }),
   Object.freeze({ id: "agents", label: "Agents", icon: "layers" }),
   Object.freeze({ id: "avatars", label: "Avatars", icon: "users" }),
+  Object.freeze({ id: "play", label: "Play", icon: "users" }),
   Object.freeze({ id: "fleet", label: "Fleet", icon: "server" }),
   Object.freeze({ id: "settings", label: "Settings", icon: "settings", footer: true }),
   Object.freeze({ id: "online", label: "AitherOS Online", icon: "desktop", footer: true }),
@@ -451,6 +461,8 @@ function wireIpc() {
   ipcMain.handle("desk:console-detach", (_event, paneId) => callWindow(paneId, "open"));
   ipcMain.handle("desk:console-reattach", (_event, paneId) => callWindow(paneId, "close"));
   ipcMain.handle("desk:console-detached", () => detachedIds());
+  // The Play pane's one channel: a route allowlist into the local game-bridge service.
+  require("./play-service.cjs").register(ipcMain);
   // Appearance: which of the family's eleven themes the desk wears. Read from and
   // written to cast.json (the desk's one synced settings file), and BROADCAST to
   // every frame -- each pane is its own document, so a theme set on the shell
