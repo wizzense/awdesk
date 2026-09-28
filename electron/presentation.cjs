@@ -245,6 +245,22 @@ const ROUTE_WINDOWS = {
       autoHideMenuBar: true,
     },
   },
+  // The Play window: the Play pane's detach target -- companions in your games.
+  // Its one IPC (desk:play) is registered by console-window.cjs via play-service.cjs.
+  play: {
+    file: "play.html",
+    preload: "play-preload.cjs",
+    window: {
+      width: 900,
+      height: 720,
+      minWidth: 560,
+      minHeight: 460,
+      show: false,
+      title: "Aither Play",
+      backgroundColor: "#0f1218",
+      autoHideMenuBar: true,
+    },
+  },
   // The Inference ops widget (owner, 2026-09-27; ported from the monorepo
   // awdesk mirror): compact, frameless, always-on-top. inference-window.cjs
   // keeps its desk:inference-* IPC, the partition-bound fetch and the
@@ -572,6 +588,11 @@ function createPresentation({
     open: () => (createCastWindow ? createCastWindow() : null),
     close: () => { if (closeCastWindow) closeCastWindow(); },
     isOpen: () => (isCastWindowOpen ? isCastWindowOpen() : false),
+  });
+  register("play", {
+    open: () => openRouteWindow("play", { electron }),
+    close: () => closeRouteWindow("play"),
+    isOpen: () => Boolean(routeWindow("play")),
   });
   register("settings", {
     open: () => createSettingsWindow(),

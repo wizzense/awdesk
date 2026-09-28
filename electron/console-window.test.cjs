@@ -20,7 +20,7 @@ test("every pane resolves to a page that exists", () => {
   const panes = paneSources("http://127.0.0.1:5173");
   // The count is asserted so a pane cannot be DROPPED by an edit that only meant
   // to reorder the rail; bump it deliberately when one is added.
-  assert.equal(panes.length, 11);  // Home added 2026-09-23 (Settings 2026-09-22)
+  assert.equal(panes.length, 12);  // Play 2026-09-27, Home 2026-09-23, Settings 2026-09-22
   for (const pane of panes) {
     if (pane.kind !== "file") continue;
     assert.ok(
@@ -35,15 +35,16 @@ test("the rail is in this exact order -- a drop or a reorder must fail here", ()
   // Listed explicitly rather than derived from PANES, so an edit that silently
   // drops or reshuffles an entry is caught here instead of only downstream.
   assert.deepEqual(PANES.map((p) => p.id),
-    ["home", "cards", "sessions", "chat", "command", "stage", "characters", "cast", "fleet",
-    "settings", "desktop"]);
+    ["home", "cards", "sessions", "chat", "command", "stage", "characters", "cast", "play",
+    "fleet", "settings", "desktop"]);
 });
 
-test("the rail is six places, each printed ONCE (the old rail printed CONTROL and PRESENCE twice)", () => {
+test("the rail is seven places, each printed ONCE (the old rail printed CONTROL and PRESENCE twice)", () => {
   const { PLACES } = require("./console-window.cjs");
   // Sessions S1: Sessions is its own place, between Decisions and Agents.
+  // Play sits after Avatars: the companions it brings into games are those bodies.
   assert.deepEqual(PLACES.filter((p) => !p.footer).map((p) => p.id),
-    ["home", "decisions", "sessions", "agents", "avatars", "fleet"]);
+    ["home", "decisions", "sessions", "agents", "avatars", "play", "fleet"]);
   const ids = PLACES.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length, "a place is listed twice");
   for (const pane of PANES) {
