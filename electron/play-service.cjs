@@ -115,7 +115,7 @@ function ensure({ spawnImpl = spawn, wait = START_WAIT_MS } = {}) {
 const ROUTES = new Set([
   "GET /health", "GET /state", "GET /doctor", "GET /companions",
   "POST /setup", "POST /start", "POST /stop", "POST /say", "POST /party", "POST /launch",
-  "POST /invite",
+  "POST /invite", "GET /presence", "POST /presence",
 ]);
 
 async function call(method, route, body) {

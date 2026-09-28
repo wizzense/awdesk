@@ -78,6 +78,17 @@
       </section>
 
       <section class="ui-card">
+        <div class="ui-card-head"><h2>What she knows</h2><span class="ui-grow"></span>
+          <span class="ui-note">titles only &mdash; never page text, prompts or the clipboard</span></div>
+        <div class="ui-row" style="gap:14px; flex-wrap:wrap">
+          <label><input type="checkbox" id="pDesktop" /> Focused window</label>
+          <label><input type="checkbox" id="pBrowser" /> Browser tab (awconnect)</label>
+          <label><input type="checkbox" id="pTerminal" /> Terminal sessions</label>
+        </div>
+        <p class="ui-note" id="presenceBrief">Nothing shared yet.</p>
+      </section>
+
+      <section class="ui-card">
         <div class="ui-card-head"><h2>Invite a friend</h2><span class="ui-grow"></span>
           <button class="ui-btn ui-small" id="invite">New room code</button></div>
         <div id="inviteOut" class="ui-note">Mints a Dark Matters room code a friend can join with.</div>
@@ -187,6 +198,21 @@ $("invite").addEventListener("click", async () => {
     : `<span class="ui-bad">${esc(r.error)}</span>`;
 });
 $("refresh").addEventListener("click", refresh);
+
+const PRESENCE = { pDesktop: "desktop", pBrowser: "browser", pTerminal: "terminal" };
+async function refreshPresence() {
+  const r = await P.presence(); if (!r || r.ok === false) return;
+  for (const [id, key] of Object.entries(PRESENCE)) $(id).checked = !!(r.enabled || {})[key];
+  $("presenceBrief").textContent = r.brief ? `Last told: ${r.brief}` : "Nothing shared yet (start the companions).";
+}
+for (const [id, key] of Object.entries(PRESENCE)) {
+  $(id).addEventListener("change", async (e) => {
+    const r = await P.setPresence({ [key]: e.target.checked });
+    if (r.ok === false) err(r.error); else refreshPresence();
+  });
+}
+refreshPresence();
+setInterval(() => { if (!document.hidden) refreshPresence(); }, 15000);
 
 refresh();
 setInterval(async () => { if (!document.hidden) renderState(await P.state()); }, 4000);

@@ -18,4 +18,8 @@ contextBridge.exposeInMainWorld("aitherPlay", {
   setParty: (party) => call("POST", "/party", { party }),
   launch: (game) => call("POST", "/launch", { game: game || "crimson-desert" }),
   invite: (hours) => call("POST", "/invite", { hours: hours || 24 }),
+  /** What the companions know about your screen, tabs and terminals, and the switches. The
+   *  desk is a no-Origin caller, so it (and only it) sees the brief and may flip them. */
+  presence: () => call("GET", "/presence"),
+  setPresence: (switches) => call("POST", "/presence", switches || {}),
 });
