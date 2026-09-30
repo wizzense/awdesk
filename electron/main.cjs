@@ -1102,7 +1102,9 @@ if (!smokeIsRequested && !app.requestSingleInstanceLock()) {
     // the app's name (screenshot, 2026-08-25). Dev uses the display name;
     // packaged installs carry the awdesk id. Changing the AUMID resets toast
     // grouping and per-app notification settings once — the deliberate cost
-    // of the rename, not a regression to chase.
+    // of the rename, not a regression to chase. The id stays com.xikhar.awdesk
+    // through the awdesk rebrand on purpose: it must equal package.json
+    // build.appId, which keys the NSIS upgrade path and existing installs.
     app.setAppUserModelId(app.isPackaged ? "com.xikhar.awdesk" : "Desk");
     app.dock?.hide();
     if (app.isPackaged) app.setAsDefaultProtocolClient(protocolScheme);

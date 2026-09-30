@@ -1,4 +1,4 @@
-# PG Ship Allowlist for Persona Desktop
+# PG Ship Allowlist for awdesk
 # Specifies what content is allowed in public/general-rated builds
 # Format: newline-delimited path globs; everything not matched is excluded
 # IMPORTANT: This is an allowlist, not a denylist. Omissions make the artifact

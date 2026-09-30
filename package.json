@@ -1,21 +1,22 @@
 {
   "name": "awdesk",
   "version": "0.1.1",
-  "description": "A realtime character presence for desktop voice experiences.",
+  "description": "awdesk: the Aitherium desktop hub for AitherOS. Avatar presence, decision cards, voice and the living desktop, on your own machine.",
   "author": {
-    "name": "xikhar",
-    "email": "xikhar@users.noreply.github.com"
+    "name": "Aitherium",
+    "email": "aither@aitherium.com",
+    "url": "https://aitherium.com"
   },
   "desktopName": "desk.desktop",
   "private": true,
   "license": "MIT",
-  "homepage": "https://github.com/xikhar/persona#readme",
+  "homepage": "https://github.com/wizzense/awdesk#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xikhar/persona.git"
+    "url": "git+https://github.com/wizzense/awdesk.git"
   },
   "bugs": {
-    "url": "https://github.com/xikhar/persona/issues"
+    "url": "https://github.com/wizzense/awdesk/issues"
   },
   "engines": {
     "node": ">=24"

@@ -1,171 +1,154 @@
 <p align="center">
-  <img src="./public/assets/avatar.png" alt="Desk avatar" width="144" />
+  <img src="./public/assets/avatar.png" alt="awdesk avatar" width="144" />
 </p>
 
-<h1 align="center">Desk</h1>
+<h1 align="center">awdesk</h1>
 
 <p align="center">
-  The AitherOS desktop hub — a realtime character presence that bridges your
-  desktop to the whole Aitherium world.
+  The Aitherium desktop hub for AitherOS. The engine of creation, on your desk.
 </p>
 
 ---
 
-Desk began as a desktop character for voice conversations. It has grown into
-the **hub that connects your physical desktop to everything else**, seamlessly,
-whether the backend is aitherium.com or your own local node:
+awdesk is the desktop app that joins your machine to AitherOS. It puts your
+agents on screen as VRM characters that speak with lip-sync, carries the Deck
+where agents ask you to decide, and hosts the Aitheros Online living desktop
+over or beside your real one. It works against aitherium.com or your own
+local node, and it runs as a tray app with one console window (shown as
+"Desk" in the taskbar and installer).
 
-- **Avatar presence** — VRM characters with lip-sync, reacting to any app's
-  voice output (the original core, still here).
-- **Living Desktop host** — one tray switch between the Living Desktop,
-  Desktop Anywhere, the AitherShell cockpit, and GobboNet, rendered over your
-  real desktop (ghost mode) or in their own windows.
-- **Agent embodiment** — the local MCP server (`:47931`) lets any agent drive
-  the avatar, and the bridge server relays voice/animation events from native
-  listeners.
-- **Decision cards** — the tray tracks the open decision-card queue
-  (`~/.aither/decisions`), raises a native notification when an agent needs
-  you, and one click opens the shared answer window (see
-  `electron/decision-cards.cjs`).
+## What it does
 
-## Platform support
+- **Avatar presence.** VRM characters with amplitude lip-sync, driven by any
+  supported app's voice output (WASAPI process loopback on Windows, PipeWire
+  on Linux, a Core Audio process tap on macOS). Several agents can hold a body
+  on the stage at once; the Stage pane moves, scales and arranges them.
+- **The Deck.** The decision-card inbox (`~/.aither/decisions`). The tray
+  badge and a native notification tell you when an agent needs you; ordinary
+  cards are answered locally. Destructive cards (awstorage deletions,
+  relocations and manage proposals) are approved with a passkey: Approve opens
+  `api.aitherium.com/approve`, Windows Hello signs it, and awstorage only
+  applies a signed answer. Rejecting never needs proof.
+- **Living desktop.** AitherDesktop (the aitherium.com desktop) as its own
+  window or drawn over your Windows desktop, one tray switch.
+- **Voice.** Push-to-talk and open mic in, spoken replies out, through the
+  awvoice tools on your AitherOS gateway. Every utterance passes a per-origin
+  audibility gate and a content-rating gate.
+- **Relay feed.** The `#agents` channel on AitherRelay and the local company
+  room, in the Chat pane; a relay message can become a work order.
+- **Console.** One window with detachable panes: Home, Decisions, Sessions,
+  Chat, Command, Stage, Characters, Voices, Play, Fleet, Settings and
+  AitherOS Online. Command turns a sentence into a session on the harness
+  daemon; Fleet brings the local AitherOS fleet down and back up.
+- **Cast and party.** `cast.json` decides who gets a body, which voice and
+  where they stand; it syncs across your machines with `awsettings`. The
+  party export writes the manifest other avatar products join on.
+- **Agent control over MCP.** A loopback MCP server lets any agent play
+  animations, switch characters, show or hide windows and report status.
 
-| Platform    | Automatic voice output listener | Distribution               |
-| ----------- | ------------------------------- | -------------------------- |
-| Linux       | PipeWire process-stream capture | AppImage and DEB           |
-| Windows     | WASAPI process-loopback capture | NSIS installer             |
-| macOS 14.2+ | Core Audio process tap          | DMG and ZIP, arm64 and x64 |
+## Install and run
 
-Linux requires `pw-dump` and `pw-record` on `PATH`. Windows process-loopback
-requires Windows 10 build 20348 or newer. macOS asks once for System Audio
-Recording permission.
-
-Each listener is scoped to the supported application's playback process. Desk
-does not capture the microphone, save audio, produce speech, transcribe content,
-or send audio over the network.
-
-## Try Desk locally
-
-Requirements:
-
-- Node.js 24 or newer
-- npm
-- A desktop session with hardware-accelerated graphics
-
-Character media is not part of the repository. Before launching, place local
-test media or redistributable media in the exact slots documented below.
+Requirements: Node.js 24+, npm, and a desktop session with hardware graphics.
+Windows is the primary target.
 
 ```bash
 npm install
-npm run demo
-```
-
-`npm run demo` builds the current renderer and launches Desk with normal
-automatic voice-output detection.
-
-For a background launch:
-
-```bash
+npm run dev          # Vite + Electron with hot reload
+npm run demo         # build the renderer once and launch
 npm start -- --background
 ```
 
-## Connect an agent to Desk
+The voice-output listener is a native helper. `npm run native:build` needs
+Visual Studio Build Tools (C++ desktop workload); without them,
+`npm run native:fetch` pulls the built helper from the newest release.
 
-With Desk running, register its local MCP server (streamable HTTP) with any
-MCP client — Claude Code, Codex, awsh, or your own:
+Packages (build on the OS you target; output goes to `release/`):
+
+```bash
+npm run dist:windows   # NSIS installer
+npm run dist:linux     # AppImage and DEB
+npm run dist:mac       # DMG and ZIP
+```
+
+The `dist:pg-*` variants strip adult-rated content (`.pgignore`) before
+building the general-audience edition.
+
+awdesk ships no character models. Enroll your own `.vrm` (tray: Characters >
+Enroll newest Downloads .vrm, `install-model.ps1 <file>`, or the VRoid Hub
+flow). Models live per user in `characters/<slug>/` and are never committed;
+see [Asset licenses](ASSET_LICENSES.md).
+
+## Configuration
+
+Everything has a working default. The variables you are most likely to set:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AITHER_PORTAL_ORIGIN` | `https://api.aitherium.com` | Where signed approvals open. https only (http allowed on loopback for development). |
+| `AITHER_HARNESS_URL` | `http://127.0.0.1:8362` | The awdk harness daemon: sessions, the local room, Command. |
+| `AITHER_HARNESS_TOKEN` | none | Bearer for the harness daemon when it requires one. |
+| `AWDESK_GATEWAY_URL` | `http://127.0.0.1:8182` | Local AitherOS MCP gateway (voice, fleet, memory tools). |
+| `AWDESK_OPS_BASE` | `https://api.aitherium.com` | Inference ops widget backend. |
+| `AWDESK_VEIL_URL` | `https://aitherium.com` | Web app used for blog and editor links. |
+| `LIVING_DESKTOP_URL` | `https://aitherium.com/` | The living desktop page. |
+| `DESK_BRIDGE_PORT` | `47931` | Loopback bridge and MCP port. |
+| `DESK_TARGET_PROCESS_PATTERN` | built-in list | Regex naming the voice app whose output drives lip-sync. |
+| `AITHER_DECISIONS_DIR` | `~/.aither/decisions` | The decision-card store. |
+
+## How it connects
+
+- **aitherium.com** serves the living desktop and AitherDesktop.
+- **api.aitherium.com** is the live web server: signed approvals and ops data.
+- **Local node.** The AitherOS MCP gateway on `127.0.0.1:8182` for voice,
+  fleet and memory tools; awdesk keeps working, with less, when it is down.
+- **Harness daemon** (`127.0.0.1:8362`, from awdk) for sessions, the company
+  room and Command. awsh and other agents reach awdesk through its MCP server:
 
 ```bash
 claude mcp add --transport http desk http://127.0.0.1:47931/mcp
-codex mcp add desk --url http://127.0.0.1:47931/mcp
 ```
 
-Sessions can then ask Desk to play an installed animation, show or hide its
-window, switch characters, open the Fleet or Command windows, and report
-whether the local character and voice listener are active. Desk remains a
-separate desktop application; the MCP connection only exposes its own
-controls. The port follows `DESK_BRIDGE_PORT` (default 47931 — 47831 sits
-inside a Windows reserved TCP range on some hosts).
+## Security model
 
-## Voice on Windows without Visual Studio
+- Renderer windows are context-isolated, sandboxed and have no Node.js
+  integration; a strict content security policy applies, popups are denied
+  and navigation off the local entry is blocked. The console window is the one
+  named `sandbox: false` exception.
+- The bridge binds `127.0.0.1` only, rejects non-loopback `Host` headers and
+  limits bodies and origins. Its MCP tools are closed schemas: no command
+  execution, no arbitrary file access.
+- The approve window follows only the portal origin and https
+  `*.aitherium.com`, its preload exposes nothing, and it keeps its sign-in in its own
+  session partition. Whether a card needs a signed answer is decided from the
+  card on disk, never from the renderer.
+- Audio listeners compute a level in memory; nothing is recorded, transcribed
+  or sent.
 
-The voice-output listener is a native helper. If `npm run native:build` cannot
-find Visual Studio Build Tools, `npm run native:fetch` pulls the built helper
-out of the newest release instead; the tray says "Voice: listener missing"
-until one is in place.
-
-The window intentionally contains no controls:
-
-- Scroll to zoom.
-- Left-drag to orbit.
-- Right-drag to pan.
-- Use your window manager's move gesture to reposition the window.
-
-On Hyprland, Desk also applies floating, pinned, topmost, full-opacity,
-no-blur, no-shadow, and decoration-free properties. macOS uses an all-Spaces
-topmost window. Other desktops use the strongest supported Electron window
-hints.
-
-## Build native packages
-
-Build on the operating system you are targeting:
-
-```bash
-npm run dist:linux
-npm run dist:windows
-npm run dist:mac
-```
-
-Outputs are written to `release/`. Windows needs Visual Studio Build Tools with
-the C++ desktop workload. macOS needs Xcode Command Line Tools and macOS 14.2+
-SDK support.
-
-GitHub Actions runs the full JavaScript, renderer, native compile, and native
-self-test suite on Linux, Windows, and macOS. Prerelease tags shaped like
-`v0.1.0-beta.0` create native packages and a checksum file, but only after the
-asset release gate passes. See [Releasing](docs/RELEASING.md).
-
-## Character assets
-
-**Desk ships no character models.** Bring your own: grab one from
-[VRoid Hub](https://hub.vroid.com/en/) (or export one with
-[VRoid Studio](https://vroid.com/en/studio)) and enroll it — tray ▸
-**Characters ▸ Enroll newest Downloads .vrm**, `install-model.ps1 <file>`, or
-the VRoid Hub flow in the desk panel. It lands in `characters/<slug>/` and the
-app copies it into `public/assets/` to render; both are per-user and
-gitignored. Your model, your license — see
-[Asset licenses](ASSET_LICENSES.md).
-
-Everything under `assets/` is per-user runtime media, never shipped and never
-committed:
-
-- `model.vrm` / `model-slot<N>.vrm` — the enrolled character (and per-slot
-  copies for extra avatars), copied in at runtime.
-- `animations/*.vrma` — VRoid Hub personality motions, downloaded through the
-  user's own VRoid Hub license when a character is enrolled; a fresh install
-  has none and the avatar stays in its idle pose.
-
-The asset contract (`scripts/check-assets.cjs`) asserts this: `manifest.assets`
-is empty, and `npm run assets:release` **fails** if any `.vrm`/`.vrma` is
-present under `public/assets/`. See [Releasing](docs/RELEASING.md).
+Details: [SECURITY.md](SECURITY.md).
 
 ## Development
 
 ```bash
-npm run check
-npm run native:build
-npm run native:test
+node --test electron/*.test.cjs   # main-process tests
+npm run test:renderer             # vitest (src/**/*.test.ts)
+npm run check                     # lint, all tests, asset gate, audit, build
 ```
 
-The native listener is required before running Desk from source on macOS or
-Windows. Linux captures activity through PipeWire and does not build a helper.
+`build.appId` stays `com.xikhar.awdesk` on purpose. It keys the Windows
+installer upgrade path and the notification identity (AUMID) of every existing
+install; changing it would install awdesk side by side instead of upgrading.
+For the same reason userData stays `%APPDATA%\Desk`.
 
-More detail:
+More: [Architecture and development](docs/DEVELOPMENT.md) ·
+[Integration API](docs/INTEGRATIONS.md) · [Releasing](docs/RELEASING.md)
 
-- [Architecture and development](docs/DEVELOPMENT.md)
-- [Codex and integration API](docs/INTEGRATIONS.md)
-- [Release process](docs/RELEASING.md)
-- [Security policy](SECURITY.md)
+## License and credits
 
-Desk application source is licensed under the [MIT License](LICENSE).
-Bundled character assets are excluded from that license and remain test-only
-until replaced and documented.
+Application source is MIT licensed; see [LICENSE](LICENSE). Character assets
+are excluded from that license.
+
+awdesk began as a fork of **Persona** by [xikhar](https://github.com/xikhar)
+(`github.com/xikhar/persona`), a realtime character presence for desktop voice
+apps. The avatar renderer, the
+native audio listeners and the loopback bridge come from that project, and its
+copyright notice is kept in the license.
