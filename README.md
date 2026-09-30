@@ -1,11 +1,9 @@
 <p align="center">
-  <img src="./public/assets/avatar.png" alt="awdesk avatar" width="144" />
+  <img src="./docs/banner.png" alt="awdesk — the AitherOS desktop hub" width="100%" />
 </p>
 
-<h1 align="center">awdesk</h1>
-
 <p align="center">
-  The Aitherium desktop hub for AitherOS. The engine of creation, on your desk.
+  The Aitherium desktop hub for AitherOS. The Element of Creation, on your desk.
 </p>
 
 ---
