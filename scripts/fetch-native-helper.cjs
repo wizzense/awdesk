@@ -25,7 +25,10 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const REPO = "wizzense/persona";
+// The repo is being renamed wizzense/persona -> wizzense/awdesk. GitHub redirects
+// the old name after a rename but the new one does not exist before it, so the
+// old name is the one that works on both sides; switch once the rename lands.
+const REPO = "wizzense/awdesk";
 const PROJECT_ROOT = path.join(__dirname, "..");
 const HELPER_SRC = path.join("native", "windows", "DeskAudioListener.cpp");
 const TARGET = path.join(PROJECT_ROOT, "native", "bin", "win32", "desk-audio-listener.exe");

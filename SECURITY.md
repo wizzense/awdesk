@@ -2,9 +2,8 @@
 
 ## Reporting
 
-Before the public repository exists, report security issues privately to the
-maintainer. After `xikhar/desk` is created, use GitHub private vulnerability
-reporting rather than a public issue.
+Report security issues privately through GitHub private vulnerability reporting
+on `wizzense/awdesk`, never in a public issue.
 
 ## Data boundary
 

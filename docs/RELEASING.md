@@ -1,7 +1,7 @@
-# Releasing Desk
+# Releasing awdesk
 
 GitHub releases are produced only from version tags. The expected repository is
-`https://github.com/xikhar/desk`; the workflow does not create or push to it.
+`https://github.com/wizzense/awdesk`; the workflow does not create or push to it.
 
 ## One-time repository setup
 

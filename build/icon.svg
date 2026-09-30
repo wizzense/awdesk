@@ -1,27 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- awdesk: the Aitherium mark (Element 0 triangle + core) held in a presence orbit.
+       Palette: .ELEMENT/brand.yaml (void #000103, cyan #2AD7D7 -> indigo #1A83DB, violet #907AE9). -->
   <defs>
-    <radialGradient id="bg" cx="34%" cy="26%" r="88%">
-      <stop offset="0" stop-color="#31376f"/>
-      <stop offset=".48" stop-color="#171a3a"/>
-      <stop offset="1" stop-color="#080913"/>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#0b1a2c"/>
+      <stop offset="0.6" stop-color="#02060D"/>
+      <stop offset="1" stop-color="#000103"/>
     </radialGradient>
-    <linearGradient id="ring" x1=".12" y1=".08" x2=".86" y2=".91">
-      <stop stop-color="#8ee8ff"/>
-      <stop offset=".48" stop-color="#9d91ff"/>
-      <stop offset="1" stop-color="#7457ed"/>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2AD7D7"/>
+      <stop offset="0.55" stop-color="#00C9C9"/>
+      <stop offset="1" stop-color="#1A83DB"/>
     </linearGradient>
-    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
-      <feGaussianBlur stdDeviation="18"/>
+    <linearGradient id="orbit" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0" stop-color="#907AE9"/>
+      <stop offset="0.5" stop-color="#6f8fe6"/>
+      <stop offset="1" stop-color="#2AD7D7"/>
+    </linearGradient>
+    <radialGradient id="core" cx="42%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#e8ffff"/>
+      <stop offset="0.35" stop-color="#2AD7D7"/>
+      <stop offset="1" stop-color="#1A83DB"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <circle cx="256" cy="256" r="146" fill="none" stroke="#7c6df2" stroke-width="30"
-          opacity=".35" filter="url(#glow)"/>
-  <circle cx="256" cy="256" r="139" fill="#0b0d1b" stroke="url(#ring)" stroke-width="22"/>
-  <path d="M178 289c23 34 50 52 78 52s55-18 78-52" fill="none"
-        stroke="#c5c9ff" stroke-width="20" stroke-linecap="round"/>
-  <circle cx="207" cy="226" r="15" fill="#eef9ff"/>
-  <circle cx="305" cy="226" r="15" fill="#eef9ff"/>
-  <path d="M101 277v-42M131 305v-98M381 305v-98M411 277v-42"
-        fill="none" stroke="#87dcff" stroke-width="18" stroke-linecap="round"/>
+  <!-- presence orbit, behind the element -->
+  <ellipse cx="256" cy="300" rx="206" ry="62" fill="none" stroke="url(#orbit)"
+           stroke-width="12" opacity="0.9" transform="rotate(-14 256 300)"/>
+  <!-- Element 0: the triangle and its core -->
+  <g filter="url(#glow)">
+    <polygon points="256,92 418,372 94,372" fill="#000103" fill-opacity="0.55"
+             stroke="url(#edge)" stroke-width="30" stroke-linejoin="round"/>
+    <circle cx="256" cy="292" r="46" fill="url(#core)"/>
+  </g>
+  <!-- the satellite: the presence the desk carries around the element -->
+  <circle cx="72" cy="352" r="18" fill="#907AE9" filter="url(#glow)"/>
 </svg>

@@ -44,7 +44,7 @@ the current one; when the one-shot clip finishes, Desk returns to the current
 idle, listening, or speaking state.
 
 The MCP endpoint uses the same port as the local HTTP API. If
-`PERSONA_BRIDGE_PORT` changes it, update the URL registered with Codex to match.
+`DESK_BRIDGE_PORT` changes it, update the URL registered with Codex to match.
 
 ## Automatic listeners
 
@@ -67,11 +67,11 @@ The native helper creates a private, unmuted Core Audio process tap and private
 aggregate device for the selected voice process. Desk supports macOS 14.2
 and newer and declares why it requests System Audio Recording permission.
 
-Set `PERSONA_TARGET_PROCESS_PATTERN` to a case-insensitive regular expression
+Set `DESK_TARGET_PROCESS_PATTERN` to a case-insensitive regular expression
 to target another desktop voice application:
 
 ```bash
-PERSONA_TARGET_PROCESS_PATTERN='my-voice-app' desk
+DESK_TARGET_PROCESS_PATTERN='my-voice-app' desk
 ```
 
 ## URL protocol
@@ -98,7 +98,7 @@ Windows.
 ## Loopback HTTP API
 
 Desk listens on `127.0.0.1:47931` by default. Override the port with
-`PERSONA_BRIDGE_PORT`. Native clients may omit `Origin`; browser clients are
+`DESK_BRIDGE_PORT`. Native clients may omit `Origin`; browser clients are
 restricted to trusted local and supported app origins. Requests with a
 non-loopback `Host` are rejected.
 
