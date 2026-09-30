@@ -335,6 +335,21 @@ function closeRouteWindow(id) {
  * choice and its own handles.
  */
 const HOSTED_WINDOWS = {
+  // The signed-APPROVAL window (signed-approval.cjs): aitherium.com/approve, where
+  // Windows Hello mints the fresh passkey session Genesis signs an owner receipt
+  // for. No desk bridge: its preload is empty on purpose.
+  approve: {
+    preload: "approve-preload.cjs",
+    place: () => ({ width: 520, height: 640 }),
+    window: {
+      resizable: true,
+      minimizable: false,
+      maximizable: false,
+      alwaysOnTop: true,
+      autoHideMenuBar: true,
+      title: "Approve with Windows Hello",
+    },
+  },
   // The living-desktop OVERLAY: the full primary work area, frameless and
   // transparent, so the Aitheros Online chrome floats over the real desktop.
   overlay: {

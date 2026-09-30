@@ -228,6 +228,31 @@ function createDecisionsPlane({
     });
     ipcMain.handle("desk:deck-answer", async (_event, payload) => {
       const { id, choice } = payload || {};
+      // A destructive card (awstorage proposal/plan) is approved only by a SIGNED
+      // answer, which needs a fresh passkey session: open Veil's /approve page
+      // (Windows Hello) instead of the unsigned awask write. The route is decided
+      // from the card FILE, never from the renderer's payload. Reject and ordinary
+      // cards keep the awask path. {pending:true} = the answer lands when the owner
+      // finishes in that window; the watcher then drops the card.
+      if (typeof id === "string" && typeof choice === "string" && choice) {
+        const signedApproval = require("./signed-approval.cjs");
+        const raw = signedApproval.readCardRaw(id, decisionCards.storeDir());
+        if (signedApproval.answerRoute(raw, choice) === "window") {
+          try {
+            const electron = require("electron");
+            signedApproval.openApproveWindow({
+              build: (partition) =>
+                require("./presentation.cjs").buildHostedWindow("approve", { electron, partition }),
+              url: signedApproval.approveUrl(id, choice),
+              log: debugLog,
+            });
+            return { pending: true, via: "approve-window" };
+          } catch (err) {
+            debugLog(`[approve] window failed for ${id}: ${err && err.message}`);
+            return false;
+          }
+        }
+      }
       const ok = (await confirmedWrite(id, () => decisionCards.answerCardConfirmed(id, choice))).ok;
       if (ok) {
         sendDeckState();
