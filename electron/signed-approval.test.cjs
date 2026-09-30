@@ -43,13 +43,13 @@ test("readCardRaw reads only a valid id inside the store", () => {
   assert.equal(sa.readCardRaw(42, dir), null);
 });
 
-test("portal origin: https or loopback http only, default aitherium.com", () => {
-  assert.equal(sa.portalOrigin({}), "https://aitherium.com");
+test("portal origin: https or loopback http only, default api.aitherium.com", () => {
+  assert.equal(sa.portalOrigin({}), "https://api.aitherium.com");
   assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "https://portal.aitherium.com/x" }), "https://portal.aitherium.com");
   assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "http://localhost:3000" }), "http://localhost:3000");
-  assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "http://evil.example" }), "https://aitherium.com");
-  assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "https://u:p@aitherium.com" }), "https://aitherium.com");
-  assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "not a url" }), "https://aitherium.com");
+  assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "http://evil.example" }), "https://api.aitherium.com");
+  assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "https://u:p@aitherium.com" }), "https://api.aitherium.com");
+  assert.equal(sa.portalOrigin({ AITHER_PORTAL_ORIGIN: "not a url" }), "https://api.aitherium.com");
   assert.equal(
     sa.approveUrl("d-1", "approve", "https://aitherium.com"),
     "https://aitherium.com/approve?card=d-1&choice=approve",

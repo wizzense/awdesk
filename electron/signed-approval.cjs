@@ -41,7 +41,8 @@ const DECLINE_KEYS = Object.freeze([
 /** Session partition for the approve window: persistent, so the Veil login cookie
  *  (set by /api/me/webauthn/authenticate PUT) survives between approvals. */
 const APPROVE_PARTITION = "persist:aither-approve";
-const DEFAULT_PORTAL_ORIGIN = "https://aitherium.com";
+// api.aitherium.com is the live Veil server; aitherium.com is the static export (no /api).
+const DEFAULT_PORTAL_ORIGIN = "https://api.aitherium.com";
 
 const CARD_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 
@@ -89,7 +90,7 @@ function readCardRaw(id, dir, fsImpl = fs) {
 }
 
 /** The portal origin: $AITHER_PORTAL_ORIGIN when it is https (or http on loopback
- *  for dev), else https://aitherium.com. Never a path, never a credential. */
+ *  for dev), else https://api.aitherium.com. Never a path, never a credential. */
 function portalOrigin(env = process.env) {
   const rawValue = String((env && env.AITHER_PORTAL_ORIGIN) || "").trim();
   if (!rawValue) return DEFAULT_PORTAL_ORIGIN;
