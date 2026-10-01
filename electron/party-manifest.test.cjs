@@ -250,3 +250,15 @@ test("party_export is an MCP tool on the Desk server and returns the export resu
   assert.equal(calls.length, 1);
   assert.ok(fs.existsSync(path.join(scratch, "mcp-party.json")));
 });
+
+test("non-ASCII roster names get distinct stable persona_ids (none dropped by de-dup)", () => {
+  const { unicodePersona, slugPersona } = require("./party-manifest.cjs");
+  const a = unicodePersona("通常版");
+  const b = unicodePersona("きわどい下着");
+  assert.match(a, /^char-[0-9a-f]{10}$/);
+  assert.match(b, /^char-[0-9a-f]{10}$/);
+  assert.notEqual(a, b, "two different names must not share a persona_id");
+  assert.equal(unicodePersona("通常版"), a, "stable across runs");
+  assert.equal(unicodePersona("Alice"), "", "an ASCII-sluggable name keeps its readable slug");
+  assert.equal(slugPersona("通常版"), "", "the readable slug alone was empty (the bug)");
+});

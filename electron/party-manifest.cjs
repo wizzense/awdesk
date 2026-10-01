@@ -81,6 +81,16 @@ function slugPersona(text) {
   return PERSONA_ID_RE.test(raw) ? raw : "";
 }
 
+/** A name with no [A-Za-z0-9] at all (きわどい下着, 通常版 ...) slugs to "" and used to fall
+ *  through to the cast key or "actor": several roster folders then SHARED one persona_id and
+ *  the de-dup below silently dropped all but the first (measured 2026-10-01: 通常版, rated
+ *  general, never reached the party). A stable ASCII id from the name keeps each distinct. */
+function unicodePersona(text) {
+  const name = String(text == null ? "" : text).normalize("NFC");
+  if (!name || slugPersona(name)) return "";
+  return `char-${require("node:crypto").createHash("sha1").update(name, "utf8").digest("hex").slice(0, 10)}`;
+}
+
 function readCharacterJson(rosterDir, name) {
   try {
     const parsed = JSON.parse(fs.readFileSync(path.join(rosterDir, name, "character.json"), "utf8"));
@@ -154,6 +164,7 @@ function memberFor({ resolved, character, rosterDir, originKey }) {
   const personaId =
     slugPersona(characterJson.persona_id) ||
     slugPersona(character) ||
+    unicodePersona(character) ||
     slugPersona(originKey) ||
     "actor";
   const displayName =
@@ -393,5 +404,6 @@ module.exports = {
   buildParty,
   exportParty,
   slugPersona,
+  unicodePersona,
   validateParty,
 };
