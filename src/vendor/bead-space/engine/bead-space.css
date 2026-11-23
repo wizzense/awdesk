@@ -437,7 +437,7 @@
   }
 }
 .bead-space .bs-node.bs-galaxy .bs-planet-core {
-  fill: var(--bs-core-tint, #5ec9cc);
+  fill: var(--bs-core-tint, #B0DAFF);
   fill-opacity: 0.22;
 }
 .bead-space .bs-node.bs-busy {

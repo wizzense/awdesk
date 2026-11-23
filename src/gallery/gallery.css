@@ -7,7 +7,7 @@
   --g-line: var(--fk-hairline, rgba(255, 255, 255, 0.08));
   --g-raise: color-mix(in srgb, var(--g-bg), var(--g-ink) 5%);
   --g-raise2: color-mix(in srgb, var(--g-bg), var(--g-ink) 9%);
-  --g-accent: var(--fk-accent, #5ec9cc);
+  --g-accent: var(--fk-accent, #B0DAFF);
   --g-safe: #4fbf7a;
   position: fixed;
   inset: 0;

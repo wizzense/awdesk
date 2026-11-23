@@ -8,6 +8,12 @@
  * same eleven theme ids. A theme sets --fk-* only; everything else aliases them.
  */
 :root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --os-dock-h: calc(3.5rem + var(--sab));
+  --os-phone-win-bottom: var(--os-dock-h);
   --ui-scale: 1;
   --ui-scale-compact: 0.85;
   --ui-scale-large: 1.15;
@@ -38,10 +44,23 @@
   --fk-dim: rgba(237,239,245,.55);
   --fk-hairline: rgba(255,255,255,.08);
   --fk-raise: rgba(255,255,255,.025);
-  --fk-accent: #5EC9CC;
+  --brand-sky: #B0DAFF;
+  --brand-sky-soft: #C3D4F6;
+  --brand-blush: #F9C6DD;
+  --brand-blush-soft: #F4CADD;
+  --brand-lavender: #D9C8F0;
+  --brand-navy: #384060;
+  --brand-ink: #384060;
+  --brand-sky-hover: #C8E4FF;
+  --brand-sky-active: #95C7F2;
+  --brand-sky-muted: #7C9DBF;
+  --brand-wash: rgba(176,218,255,.10);
+  --brand-border: rgba(176,218,255,.38);
+  --brand-gradient: linear-gradient(135deg,#B0DAFF 0%,#D9C8F0 50%,#F9C6DD 100%);
+  --fk-accent: #B0DAFF;
   --fk-accent-glow: color-mix(in srgb, var(--fk-accent) 35%, transparent);
   --fk-accent-wash: color-mix(in srgb, var(--fk-accent) 8%, transparent);
-  --fk-on-accent: var(--fk-bg);
+  --fk-on-accent: #384060;
   --aither-accent: var(--fk-accent);
   --tenant-accent: var(--fk-accent);
   --theme-accent: var(--fk-accent);
@@ -71,8 +90,8 @@
   --pastel-rose-dim: oklch(0.56 0.12 350);
   --pastel-lemon: oklch(0.88 0.12 95);
   --pastel-lemon-dim: oklch(0.68 0.10 95);
-  --pastel-aqua: oklch(0.80 0.10 195);
-  --pastel-aqua-dim: oklch(0.58 0.08 195);
+  --pastel-aqua: #8EC5FF;
+  --pastel-aqua-dim: #5E93C9;
   --entity-owner: oklch(0.82 0.14 55);
   --entity-ai-core: oklch(0.78 0.14 290);
   --entity-persona: oklch(0.78 0.14 350);
@@ -87,8 +106,8 @@
   --success-foreground: oklch(0.15 0.02 150);
   --warning: oklch(0.80 0.15 85);
   --warning-foreground: oklch(0.15 0.02 85);
-  --cyan: oklch(0.80 0.13 195);
-  --cyan-foreground: oklch(0.15 0.02 195);
+  --cyan: #B0DAFF;
+  --cyan-foreground: #384060;
   --border: color-mix(in srgb, var(--fk-bg), var(--fk-ink) 16%);
   --input: color-mix(in srgb, var(--fk-bg), var(--fk-ink) 7%);
   --ring: var(--fk-accent);
@@ -100,7 +119,7 @@
   --bg-elevated: var(--card);
   --glass-border: var(--border);
   --accent-primary: var(--fk-accent);
-  --accent-secondary: var(--pastel-lavender);
+  --accent-secondary: var(--brand-blush);
   --accent-danger: var(--destructive);
   --chart-1: var(--fk-accent);
   --chart-2: var(--pastel-mint);
@@ -153,7 +172,7 @@
   --fk-dim: rgba(237,239,245,.55);
   --fk-hairline: rgba(255,255,255,.08);
   --fk-raise: rgba(255,255,255,.025);
-  --fk-accent: #5EC9CC;
+  --fk-accent: #B0DAFF;
 }
 
 [data-theme="midnight-ocean"] {
